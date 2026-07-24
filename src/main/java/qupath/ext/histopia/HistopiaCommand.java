@@ -42,7 +42,10 @@ final class HistopiaCommand {
         return moduleCommand(
                 python,
                 "histopia.registration._cli",
-                List.of("--config", config.toAbsolutePath().toString()));
+                List.of(
+                        "--config",
+                        config.toAbsolutePath().toString(),
+                        "--staged"));
     }
 
     static List<String> runSemantic(
@@ -86,6 +89,42 @@ final class HistopiaCommand {
                 "histopia.registration._cli",
                 List.of(
                         "--approve-run",
+                        registrationRun.toAbsolutePath().toString(),
+                        "--reviewer",
+                        reviewer,
+                        "--review-notes",
+                        notes));
+    }
+
+    static List<String> approveMasks(
+            String python,
+            Path registrationRun,
+            String reviewer,
+            String notes) {
+        return approvalCommand(
+                python, "--approve-masks", registrationRun, reviewer, notes);
+    }
+
+    static List<String> approveOrder(
+            String python,
+            Path registrationRun,
+            String reviewer,
+            String notes) {
+        return approvalCommand(
+                python, "--approve-order", registrationRun, reviewer, notes);
+    }
+
+    private static List<String> approvalCommand(
+            String python,
+            String action,
+            Path registrationRun,
+            String reviewer,
+            String notes) {
+        return moduleCommand(
+                python,
+                "histopia.registration._cli",
+                List.of(
+                        action,
                         registrationRun.toAbsolutePath().toString(),
                         "--reviewer",
                         reviewer,

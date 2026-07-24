@@ -145,6 +145,8 @@ final class HistopiaWorkflow {
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
         registration.addProperty("preprocessing_cache", true);
+        registration.addProperty("require_approved_masks", true);
+        registration.addProperty("require_approved_order", true);
         registration.addProperty("wsi_only", true);
         registration.addProperty("max_processed_image_dim_px", maxProcessedDimension);
         registration.addProperty("write_processed_images", true);
@@ -204,6 +206,18 @@ final class HistopiaWorkflow {
                 selectionPath,
                 registrationRun,
                 semanticRun);
+    }
+
+    static String registrationStatus(Path registrationRun) {
+        if (Files.isRegularFile(registrationRun.resolve("registration_approval.json")))
+            return "Registration sealed";
+        if (Files.isRegularFile(registrationRun.resolve("registration_result.json")))
+            return "Registration completed; final review required";
+        if (Files.isRegularFile(registrationRun.resolve("section_order_review.json")))
+            return "Section order review required";
+        if (Files.isRegularFile(registrationRun.resolve("mask_review.json")))
+            return "Tissue mask review required";
+        return "Registration completed without review artifacts";
     }
 
     private static Path localWsiPath(URI uri) {

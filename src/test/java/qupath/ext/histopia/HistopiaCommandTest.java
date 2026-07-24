@@ -42,6 +42,7 @@ class HistopiaCommandTest {
 
         assertEquals("histopia.registration._cli", registration.get(2));
         assertEquals("--config", registration.get(3));
+        assertEquals("--staged", registration.get(registration.size() - 1));
         assertEquals("histopia.semantic._cli", semantic.get(2));
         assertEquals("run", semantic.get(3));
         assertEquals("--allow-model-download", semantic.get(semantic.size() - 1));
@@ -61,6 +62,19 @@ class HistopiaCommandTest {
         assertEquals(
                 "Masks and physical order reviewed",
                 command.get(command.indexOf("--review-notes") + 1));
+    }
+
+    @Test
+    void buildsStageApprovalCommandsWithoutShellInterpolation() {
+        var masks = HistopiaCommand.approveMasks(
+                "python", Path.of("registration run"), "Reviewer", "Masks reviewed");
+        var order = HistopiaCommand.approveOrder(
+                "python", Path.of("registration run"), "Reviewer", "Order reviewed");
+
+        assertEquals("--approve-masks", masks.get(3));
+        assertEquals("--approve-order", order.get(3));
+        assertEquals("Reviewer", masks.get(masks.indexOf("--reviewer") + 1));
+        assertEquals("Order reviewed", order.get(order.indexOf("--review-notes") + 1));
     }
 
     @Test

@@ -85,7 +85,9 @@ final class HistopiaPanel {
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
     private final Button openProjectReview = new Button("Open registration QC");
-    private final Button approveProjectRegistration = new Button("Approve reviewed run");
+    private final Button approveProjectMasks = new Button("Approve masks");
+    private final Button approveProjectOrder = new Button("Approve order");
+    private final Button approveProjectRegistration = new Button("Seal reviewed run");
     private final Button export = new Button("Export bundle");
     private final Button cancel = new Button("Cancel");
     private final Label status = new Label("Ready");
@@ -202,6 +204,8 @@ final class HistopiaPanel {
         settings.setPrefWrapLength(820);
         runProjectRegistration.setOnAction(event -> startProjectRegistration());
         runProjectSemantic.setOnAction(event -> startProjectSemantic());
+        approveProjectMasks.setOnAction(event -> approveProjectMasks());
+        approveProjectOrder.setOnAction(event -> approveProjectOrder());
         approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
         openProjectReview.setOnAction(event -> openRegistrationReview());
         var review = new FlowPane(
@@ -209,10 +213,12 @@ final class HistopiaPanel {
                 labeledField("Review notes", reviewNotes));
         review.setHgap(8);
         review.setVgap(6);
-        var actions = new HBox(
-                8,
+        var actions = new FlowPane(
+                8, 6,
                 runProjectRegistration,
                 openProjectReview,
+                approveProjectMasks,
+                approveProjectOrder,
                 approveProjectRegistration,
                 runProjectSemantic,
                 projectAllowModelDownload);
@@ -359,7 +365,9 @@ final class HistopiaPanel {
             startJob(
                     "Registration",
                     HistopiaCommand.runRegistration(
-                            python.getText(), files.registrationConfig()));
+                            python.getText(), files.registrationConfig()),
+                    () -> status.setText(
+                            HistopiaWorkflow.registrationStatus(files.registrationRun())));
         } catch (IOException | IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia registration", error.getMessage());
         }
@@ -369,9 +377,10 @@ final class HistopiaPanel {
         try {
             requiredPath(modelCache, "UNI2-h model cache");
             var files = prepareProjectWorkflow();
-            if (!Files.isDirectory(files.registrationRun()))
+            if (!Files.isRegularFile(
+                    files.registrationRun().resolve("registration_approval.json")))
                 throw new IllegalArgumentException(
-                        "Run and review registration in this workspace first");
+                        "Seal the reviewed registration before semantic analysis");
             startJob(
                     "Semantic atlas",
                     HistopiaCommand.runSemantic(
@@ -387,9 +396,9 @@ final class HistopiaPanel {
         try {
             var workspacePath = requiredPath(workspace, "Analysis workspace");
             var run = workspacePath.resolve("registration");
-            if (!Files.isRegularFile(run.resolve("registration_result.json")))
+            if (!Files.isRegularFile(run.resolve("mask_review.json")))
                 throw new IllegalArgumentException(
-                        "Run registration in this workspace first");
+                        "Run registration once to prepare tissue masks");
             var output = workspacePath.resolve(".histopia").resolve("registration-review");
             var index = output.resolve("index.html");
             startJob(
@@ -409,19 +418,51 @@ final class HistopiaPanel {
         }
     }
 
+    private void approveProjectMasks() {
+        approveProjectStage(
+                "Mask approval",
+                "mask_review.json",
+                HistopiaCommand::approveMasks);
+    }
+
+    private void approveProjectOrder() {
+        approveProjectStage(
+                "Order approval",
+                "section_order_review.json",
+                HistopiaCommand::approveOrder);
+    }
+
     private void approveProjectRegistration() {
+        approveProjectStage(
+                "Registration approval",
+                "registration_result.json",
+                HistopiaCommand::approveRegistration);
+    }
+
+    private void approveProjectStage(
+            String name,
+            String requiredArtifact,
+            ApprovalCommand command) {
         try {
             var run = requiredPath(workspace, "Analysis workspace")
                     .resolve("registration");
+            if (!Files.isRegularFile(run.resolve(requiredArtifact)))
+                throw new IllegalArgumentException(
+                        "Run registration to prepare " + requiredArtifact);
             var reviewerName = requiredText(reviewer, "Reviewer");
             var notes = requiredText(reviewNotes, "Review notes");
             startJob(
-                    "Registration approval",
-                    HistopiaCommand.approveRegistration(
+                    name,
+                    command.build(
                             python.getText(), run, reviewerName, notes));
         } catch (IllegalArgumentException error) {
-            Dialogs.showErrorMessage("Histopia registration approval", error.getMessage());
+            Dialogs.showErrorMessage(name, error.getMessage());
         }
+    }
+
+    @FunctionalInterface
+    private interface ApprovalCommand {
+        List<String> build(String python, Path run, String reviewer, String notes);
     }
 
     private HistopiaWorkflow.WorkflowFiles prepareProjectWorkflow() throws IOException {
@@ -516,14 +557,14 @@ final class HistopiaPanel {
         appendLog("$ " + command.stream().collect(Collectors.joining(" ")));
         CompletableFuture
                 .supplyAsync(() -> run(command), executor)
-                .whenComplete((message, error) -> Platform.runLater(() -> {
+                .whenComplete((ignored, error) -> Platform.runLater(() -> {
                     setJobRunning(false);
                     if (error == null) {
                         try {
+                            status.setText(name + " completed");
                             if (onSuccess != null)
                                 onSuccess.run();
-                            status.setText(name + " completed");
-                            Dialogs.showInfoNotification("Histopia", message);
+                            Dialogs.showInfoNotification("Histopia", status.getText());
                         } catch (RuntimeException callbackError) {
                             status.setText(name + " failed");
                             Dialogs.showErrorMessage(name, callbackError.getMessage());
@@ -585,6 +626,8 @@ final class HistopiaPanel {
         runProjectRegistration.setDisable(running);
         runProjectSemantic.setDisable(running);
         openProjectReview.setDisable(running);
+        approveProjectMasks.setDisable(running);
+        approveProjectOrder.setDisable(running);
         approveProjectRegistration.setDisable(running);
         export.setDisable(running);
         cancel.setDisable(!running);

@@ -4,6 +4,7 @@ import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -50,6 +51,8 @@ class HistopiaWorkflowTest {
                 files.selectionManifest().toString(),
                 registration.get("section_order_path").getAsString());
         assertTrue(registration.get("preprocessing_cache").getAsBoolean());
+        assertTrue(registration.get("require_approved_masks").getAsBoolean());
+        assertTrue(registration.get("require_approved_order").getAsBoolean());
 
         var semantic = JsonParser.parseString(
                 java.nio.file.Files.readString(files.semanticConfig()))
@@ -109,5 +112,31 @@ class HistopiaWorkflowTest {
         assertEquals(
                 null,
                 HistopiaWorkflow.preferredReference(List.of(), first));
+    }
+
+    @Test
+    void reportsEveryRegistrationReviewGate() throws Exception {
+        var run = tempDir.resolve("registration");
+        Files.createDirectories(run);
+
+        assertEquals(
+                "Registration completed without review artifacts",
+                HistopiaWorkflow.registrationStatus(run));
+        Files.writeString(run.resolve("mask_review.json"), "{}");
+        assertEquals(
+                "Tissue mask review required",
+                HistopiaWorkflow.registrationStatus(run));
+        Files.writeString(run.resolve("section_order_review.json"), "{}");
+        assertEquals(
+                "Section order review required",
+                HistopiaWorkflow.registrationStatus(run));
+        Files.writeString(run.resolve("registration_result.json"), "{}");
+        assertEquals(
+                "Registration completed; final review required",
+                HistopiaWorkflow.registrationStatus(run));
+        Files.writeString(run.resolve("registration_approval.json"), "{}");
+        assertEquals(
+                "Registration sealed",
+                HistopiaWorkflow.registrationStatus(run));
     }
 }
