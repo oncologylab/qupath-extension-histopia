@@ -35,7 +35,7 @@ public final class HistopiaExtension implements QuPathExtension {
 
     @Override
     public String getDescription() {
-        return "Registration and semantic atlas interoperability for Histopia";
+        return "Project-driven registration and semantic atlas workflows for Histopia";
     }
 
     @Override

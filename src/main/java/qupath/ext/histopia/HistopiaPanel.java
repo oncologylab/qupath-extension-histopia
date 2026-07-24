@@ -1,17 +1,22 @@
 package qupath.ext.histopia;
 
 import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -23,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.io.PathIO;
 
 import java.io.BufferedReader;
@@ -44,6 +50,24 @@ final class HistopiaPanel {
     private final QuPathGUI qupath;
     private final Stage stage = new Stage();
     private final TextField python = new TextField("python");
+    private final ListView<HistopiaWorkflow.ProjectSlide> projectSlides = new ListView<>();
+    private final ComboBox<HistopiaWorkflow.ProjectSlide> projectReference = new ComboBox<>();
+    private final ComboBox<String> projectOrder = new ComboBox<>();
+    private final ComboBox<String> semanticDevice = new ComboBox<>();
+    private final TextField workspace = new TextField();
+    private final TextField modelCache = new TextField();
+    private final TextField processedDimension = new TextField("1200");
+    private final TextField registrationWorkers = new TextField(
+            Integer.toString(Math.max(1, Runtime.getRuntime().availableProcessors() / 2)));
+    private final TextField clusterMin = new TextField("5");
+    private final TextField clusterMax = new TextField("15");
+    private final TextField semanticBatchSize = new TextField("64");
+    private final TextField patchWorkers = new TextField("1");
+    private final TextField reviewer = new TextField();
+    private final TextField reviewNotes = new TextField();
+    private final CheckBox automaticReference = new CheckBox("Choose reference automatically");
+    private final CheckBox projectAllowModelDownload =
+            new CheckBox("Allow authenticated model download");
     private final TextField registrationConfig = new TextField();
     private final TextField semanticConfig = new TextField();
     private final TextField registration = new TextField();
@@ -57,6 +81,9 @@ final class HistopiaPanel {
     private final ComboBox<Integer> clusters = new ComboBox<>();
     private final Button runRegistration = new Button("Run registration");
     private final Button runSemantic = new Button("Run semantic atlas");
+    private final Button runProjectRegistration = new Button("Run registration");
+    private final Button runProjectSemantic = new Button("Run semantic atlas");
+    private final Button approveProjectRegistration = new Button("Approve reviewed run");
     private final Button export = new Button("Export bundle");
     private final Button cancel = new Button("Cancel");
     private final Label status = new Label("Ready");
@@ -74,8 +101,24 @@ final class HistopiaPanel {
         stage.initOwner(qupath.getStage());
         stage.setTitle("Histopia");
         stage.setScene(new Scene(createContent()));
-        stage.setMinWidth(760);
+        stage.setMinWidth(900);
         stage.setMinHeight(620);
+        projectSlides.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        projectSlides.getSelectionModel().getSelectedItems().addListener(
+                (ListChangeListener<HistopiaWorkflow.ProjectSlide>) change ->
+                        refreshReferenceChoices());
+        projectSlides.setPrefHeight(230);
+        projectOrder.getItems().setAll(
+                "anchored_similarity", "similarity", "natural");
+        projectOrder.setValue("anchored_similarity");
+        semanticDevice.getItems().setAll("auto", "cpu", "cuda", "mps");
+        semanticDevice.setValue("auto");
+        automaticReference.setSelected(true);
+        projectReference.setDisable(true);
+        automaticReference.selectedProperty().addListener(
+                (observable, oldValue, selected) ->
+                        projectReference.setDisable(selected));
+        refreshProjectSlides();
         includeSemantic.selectedProperty().addListener(
                 (observable, oldValue, selected) -> {
                     semantic.setDisable(!selected);
@@ -106,6 +149,7 @@ final class HistopiaPanel {
         root.setTop(pythonRow);
 
         var tabs = new TabPane(
+                fixedTab("Project workflow", createProjectWorkflowPane()),
                 fixedTab("Run analysis", createAnalysisPane()),
                 fixedTab("Export and import", createExportPane()));
         BorderPane.setMargin(tabs, new Insets(12, 0, 12, 0));
@@ -116,6 +160,63 @@ final class HistopiaPanel {
         VBox.setVgrow(log, Priority.ALWAYS);
         root.setBottom(footer);
         return root;
+    }
+
+    private VBox createProjectWorkflowPane() {
+        var refresh = new Button("Refresh project");
+        var selectAll = new Button("Select all");
+        var selectNone = new Button("Clear");
+        refresh.setOnAction(event -> refreshProjectSlides());
+        selectAll.setOnAction(event -> projectSlides.getSelectionModel().selectAll());
+        selectNone.setOnAction(event -> projectSlides.getSelectionModel().clearSelection());
+
+        var selectionHeader = new HBox(
+                8,
+                new Label("Project slides"),
+                refresh,
+                selectAll,
+                selectNone);
+        var paths = configuredGrid();
+        addDirectoryRow(paths, 0, "Analysis workspace", workspace, null);
+        addDirectoryRow(paths, 1, "UNI2-h model cache", modelCache, null);
+        paths.add(new Label("Reference"), 0, 2);
+        paths.add(new VBox(4, automaticReference, projectReference), 1, 2);
+        paths.add(new Label("Section order"), 0, 3);
+        paths.add(projectOrder, 1, 3);
+
+        var settings = new FlowPane(
+                labeledField("Processed px", processedDimension),
+                labeledField("Registration workers", registrationWorkers),
+                labeledField("Device", semanticDevice),
+                labeledField("K min", clusterMin),
+                labeledField("K max", clusterMax),
+                labeledField("Batch", semanticBatchSize),
+                labeledField("Patch workers", patchWorkers));
+        settings.setHgap(8);
+        settings.setVgap(6);
+        settings.setPrefWrapLength(820);
+        runProjectRegistration.setOnAction(event -> startProjectRegistration());
+        runProjectSemantic.setOnAction(event -> startProjectSemantic());
+        approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
+        var openReview = new Button("Open registration QC");
+        openReview.setOnAction(event -> openRegistrationReview());
+        var review = new FlowPane(
+                labeledField("Reviewer", reviewer),
+                labeledField("Review notes", reviewNotes));
+        review.setHgap(8);
+        review.setVgap(6);
+        var actions = new HBox(
+                8,
+                runProjectRegistration,
+                openReview,
+                approveProjectRegistration,
+                runProjectSemantic,
+                projectAllowModelDownload);
+        var pane = new VBox(
+                8, selectionHeader, projectSlides, paths, settings, review, actions);
+        pane.setPadding(new Insets(12));
+        VBox.setVgrow(projectSlides, Priority.ALWAYS);
+        return pane;
     }
 
     private GridPane createAnalysisPane() {
@@ -159,10 +260,14 @@ final class HistopiaPanel {
         return grid;
     }
 
-    private static Tab fixedTab(String title, GridPane content) {
+    private static Tab fixedTab(String title, Node content) {
         var tab = new Tab(title, content);
         tab.setClosable(false);
         return tab;
+    }
+
+    private static VBox labeledField(String label, Node field) {
+        return new VBox(3, new Label(label), field);
     }
 
     private void addDirectoryRow(
@@ -222,6 +327,110 @@ final class HistopiaPanel {
         } catch (IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia registration", error.getMessage());
         }
+    }
+
+    private void refreshProjectSlides() {
+        var selection = HistopiaWorkflow.discover(qupath.getProject());
+        projectSlides.getItems().setAll(selection.slides());
+        projectSlides.getSelectionModel().selectAll();
+        refreshReferenceChoices();
+        var message = selection.slides().size() + " local WSI project images available";
+        if (!selection.warnings().isEmpty())
+            message += "; " + selection.warnings().size() + " unsupported entries skipped";
+        status.setText(message);
+    }
+
+    private void refreshReferenceChoices() {
+        var previous = projectReference.getValue();
+        var selected = List.copyOf(
+                projectSlides.getSelectionModel().getSelectedItems());
+        projectReference.getItems().setAll(selected);
+        if (selected.contains(previous))
+            projectReference.setValue(previous);
+        else if (!selected.isEmpty())
+            projectReference.setValue(selected.get(0));
+    }
+
+    private void startProjectRegistration() {
+        try {
+            var files = prepareProjectWorkflow();
+            startJob(
+                    "Registration",
+                    HistopiaCommand.runRegistration(
+                            python.getText(), files.registrationConfig()));
+        } catch (IOException | IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia registration", error.getMessage());
+        }
+    }
+
+    private void startProjectSemantic() {
+        try {
+            requiredPath(modelCache, "UNI2-h model cache");
+            var files = prepareProjectWorkflow();
+            if (!Files.isDirectory(files.registrationRun()))
+                throw new IllegalArgumentException(
+                        "Run and review registration in this workspace first");
+            startJob(
+                    "Semantic atlas",
+                    HistopiaCommand.runSemantic(
+                            python.getText(),
+                            files.semanticConfig(),
+                            projectAllowModelDownload.isSelected()));
+        } catch (IOException | IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia semantic atlas", error.getMessage());
+        }
+    }
+
+    private void openRegistrationReview() {
+        try {
+            var run = requiredPath(workspace, "Analysis workspace")
+                    .resolve("registration");
+            if (!Files.isDirectory(run))
+                throw new IllegalArgumentException(
+                        "Run registration in this workspace first");
+            if (!GuiTools.browseDirectory(run.toFile()))
+                throw new IllegalStateException("Could not open the registration directory");
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            Dialogs.showErrorMessage("Histopia registration QC", error.getMessage());
+        }
+    }
+
+    private void approveProjectRegistration() {
+        try {
+            var run = requiredPath(workspace, "Analysis workspace")
+                    .resolve("registration");
+            var reviewerName = requiredText(reviewer, "Reviewer");
+            var notes = requiredText(reviewNotes, "Review notes");
+            startJob(
+                    "Registration approval",
+                    HistopiaCommand.approveRegistration(
+                            python.getText(), run, reviewerName, notes));
+        } catch (IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia registration approval", error.getMessage());
+        }
+    }
+
+    private HistopiaWorkflow.WorkflowFiles prepareProjectWorkflow() throws IOException {
+        var selected = List.copyOf(
+                projectSlides.getSelectionModel().getSelectedItems());
+        var files = HistopiaWorkflow.writeConfigs(
+                requiredPath(workspace, "Analysis workspace"),
+                selected,
+                automaticReference.isSelected() ? null : projectReference.getValue(),
+                projectOrder.getValue(),
+                positiveInteger(processedDimension, "Processed image dimension"),
+                positiveInteger(registrationWorkers, "Registration workers"),
+                optionalPath(modelCache),
+                semanticDevice.getValue(),
+                positiveInteger(clusterMin, "K min"),
+                positiveInteger(clusterMax, "K max"),
+                positiveInteger(semanticBatchSize, "Semantic batch size"),
+                positiveInteger(patchWorkers, "Patch workers"));
+        registrationConfig.setText(files.registrationConfig().toString());
+        semanticConfig.setText(files.semanticConfig().toString());
+        registration.setText(files.registrationRun().toString());
+        semantic.setText(files.semanticRun().toString());
+        return files;
     }
 
     private void startSemantic() {
@@ -345,6 +554,9 @@ final class HistopiaPanel {
     private void setJobRunning(boolean running) {
         runRegistration.setDisable(running);
         runSemantic.setDisable(running);
+        runProjectRegistration.setDisable(running);
+        runProjectSemantic.setDisable(running);
+        approveProjectRegistration.setDisable(running);
         export.setDisable(running);
         cancel.setDisable(!running);
         cancel.setOnAction(event -> cancelActiveJob());
@@ -358,6 +570,7 @@ final class HistopiaPanel {
             return;
         }
         status.setText("Cancelling...");
+        process.descendants().forEach(ProcessHandle::destroy);
         process.destroy();
     }
 
@@ -427,5 +640,28 @@ final class HistopiaPanel {
         if (field.getText() == null || field.getText().isBlank())
             throw new IllegalArgumentException(name + " is required");
         return Path.of(field.getText()).toAbsolutePath().normalize();
+    }
+
+    private static Path optionalPath(TextField field) {
+        if (field.getText() == null || field.getText().isBlank())
+            return null;
+        return Path.of(field.getText()).toAbsolutePath().normalize();
+    }
+
+    private static int positiveInteger(TextField field, String name) {
+        try {
+            var value = Integer.parseInt(field.getText());
+            if (value <= 0)
+                throw new NumberFormatException();
+            return value;
+        } catch (NumberFormatException error) {
+            throw new IllegalArgumentException(name + " must be a positive integer");
+        }
+    }
+
+    private static String requiredText(TextField field, String name) {
+        if (field.getText() == null || field.getText().isBlank())
+            throw new IllegalArgumentException(name + " is required");
+        return field.getText().strip();
     }
 }

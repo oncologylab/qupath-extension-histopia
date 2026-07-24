@@ -9,8 +9,14 @@ semantic-atlas results.
 
 ## Capabilities
 
+- select an exact cohort directly from the open QuPath project
+- preserve project order or morphology-sort sections, with an optional fixed
+  reference as the first order anchor
+- configure registration, UNI2-h semantic analysis, CPU/GPU execution, and K
+  range without authoring config files
 - run registration and global semantic-atlas configs without blocking QuPath
 - stream Python progress and cancel the active process
+- open registration QC and record fingerprint-bound reviewer approval
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
@@ -25,7 +31,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.1.0.jar` from the
+Download `qupath-extension-histopia-0.2.0.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -33,7 +39,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.1.0.jar.sha256
+sha256sum --check qupath-extension-histopia-0.2.0.jar.sha256
 ```
 
 ## Build From Source
@@ -44,10 +50,16 @@ sha256sum --check qupath-extension-histopia-0.1.0.jar.sha256
 
 The installable JAR is written under `build/libs`.
 
-The **Run analysis** tab accepts Histopia TOML or JSON configs for registration
-and semantic analysis. The **Export and import** tab writes a QuPath bundle,
-loads the available semantic K values, and imports annotations for the
-currently open matching source slide.
+The **Project workflow** tab lists supported local WSI entries from the open
+QuPath project. Select at least two slides, choose a workspace and optional
+reference, then run registration. Review its QC, record approval, and run the
+semantic atlas from the same tab. Runtime configs and an exact project-selection
+manifest are kept in `<workspace>/.histopia`.
+
+The **Run analysis** tab remains available for advanced TOML or JSON configs.
+The **Export and import** tab writes a QuPath bundle, loads the available
+semantic K values, and imports annotations for the currently open matching
+source slide.
 
 Semantic annotations are exported in original WSI pixel coordinates. Histopia
 thumbnail registration matrices are included as provenance and are not applied
@@ -64,6 +76,7 @@ for Python installation, bundle guarantees, and CLI usage.
 - QuPath 0.7
 - Java version supported by QuPath
 - Python 3.10 or later with Histopia installed
+- project entries backed by one local NDPI, SCN, SVS, TIFF, or OME-TIFF URI
 
 ## License
 

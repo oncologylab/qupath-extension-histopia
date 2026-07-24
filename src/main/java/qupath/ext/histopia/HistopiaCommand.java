@@ -58,6 +58,23 @@ final class HistopiaCommand {
         return moduleCommand(python, "histopia.semantic._cli", arguments);
     }
 
+    static List<String> approveRegistration(
+            String python,
+            Path registrationRun,
+            String reviewer,
+            String notes) {
+        return moduleCommand(
+                python,
+                "histopia.registration._cli",
+                List.of(
+                        "--approve-run",
+                        registrationRun.toAbsolutePath().toString(),
+                        "--reviewer",
+                        reviewer,
+                        "--review-notes",
+                        notes));
+    }
+
     private static List<String> moduleCommand(
             String python,
             String module,
