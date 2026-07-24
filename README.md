@@ -16,7 +16,8 @@ semantic-atlas results.
   range without authoring config files
 - run registration and global semantic-atlas configs without blocking QuPath
 - stream Python progress and cancel the active process
-- open registration QC and record fingerprint-bound reviewer approval
+- build and open one local mask/order QC portal, then record fingerprint-bound
+  reviewer approval
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
@@ -31,7 +32,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.2.1.jar` from the
+Download `qupath-extension-histopia-0.2.2.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -39,7 +40,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.2.1.jar.sha256
+sha256sum --check qupath-extension-histopia-0.2.2.jar.sha256
 ```
 
 ## Build From Source
@@ -52,9 +53,11 @@ The installable JAR is written under `build/libs`.
 
 The **Project workflow** tab lists supported local WSI entries from the open
 QuPath project. Select at least two slides, choose a workspace and optional
-reference, then run registration. Review its QC, record approval, and run the
-semantic atlas from the same tab. Runtime configs and an exact project-selection
-manifest are kept in `<workspace>/.histopia`.
+reference, then run registration. **Open registration QC** builds and opens a
+self-contained mask/order reviewer in the default browser. Record approval,
+then run the semantic atlas from the same tab. Runtime configs, the exact
+project-selection manifest, and local review portal are kept in
+`<workspace>/.histopia`.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available

@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 final class HistopiaPanel {
 
     private static final Logger logger = LoggerFactory.getLogger(HistopiaPanel.class);
+    private static final int REVIEW_WORKERS = 4;
     private final QuPathGUI qupath;
     private final Stage stage = new Stage();
     private final TextField python = new TextField("python");
@@ -83,6 +84,7 @@ final class HistopiaPanel {
     private final Button runSemantic = new Button("Run semantic atlas");
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
+    private final Button openProjectReview = new Button("Open registration QC");
     private final Button approveProjectRegistration = new Button("Approve reviewed run");
     private final Button export = new Button("Export bundle");
     private final Button cancel = new Button("Cancel");
@@ -201,8 +203,7 @@ final class HistopiaPanel {
         runProjectRegistration.setOnAction(event -> startProjectRegistration());
         runProjectSemantic.setOnAction(event -> startProjectSemantic());
         approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
-        var openReview = new Button("Open registration QC");
-        openReview.setOnAction(event -> openRegistrationReview());
+        openProjectReview.setOnAction(event -> openRegistrationReview());
         var review = new FlowPane(
                 labeledField("Reviewer", reviewer),
                 labeledField("Review notes", reviewNotes));
@@ -211,7 +212,7 @@ final class HistopiaPanel {
         var actions = new HBox(
                 8,
                 runProjectRegistration,
-                openReview,
+                openProjectReview,
                 approveProjectRegistration,
                 runProjectSemantic,
                 projectAllowModelDownload);
@@ -384,14 +385,26 @@ final class HistopiaPanel {
 
     private void openRegistrationReview() {
         try {
-            var run = requiredPath(workspace, "Analysis workspace")
-                    .resolve("registration");
-            if (!Files.isDirectory(run))
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var run = workspacePath.resolve("registration");
+            if (!Files.isRegularFile(run.resolve("registration_result.json")))
                 throw new IllegalArgumentException(
                         "Run registration in this workspace first");
-            if (!GuiTools.browseDirectory(run.toFile()))
-                throw new IllegalStateException("Could not open the registration directory");
-        } catch (IllegalArgumentException | IllegalStateException error) {
+            var output = workspacePath.resolve(".histopia").resolve("registration-review");
+            var index = output.resolve("index.html");
+            startJob(
+                    "Registration QC",
+                    HistopiaCommand.buildRegistrationReview(
+                            python.getText(),
+                            run,
+                            output,
+                            REVIEW_WORKERS),
+                    () -> {
+                        if (!GuiTools.browseURI(index.toUri()))
+                            throw new IllegalStateException(
+                                    "Could not open the registration review");
+                    });
+        } catch (IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia registration QC", error.getMessage());
         }
     }
@@ -484,6 +497,13 @@ final class HistopiaPanel {
     }
 
     private void startJob(String name, List<String> command) {
+        startJob(name, command, null);
+    }
+
+    private void startJob(
+            String name,
+            List<String> command,
+            Runnable onSuccess) {
         if (activeProcess != null) {
             Dialogs.showErrorMessage(
                     "Histopia", "Another Histopia process is already running.");
@@ -499,8 +519,15 @@ final class HistopiaPanel {
                 .whenComplete((message, error) -> Platform.runLater(() -> {
                     setJobRunning(false);
                     if (error == null) {
-                        status.setText(name + " completed");
-                        Dialogs.showInfoNotification("Histopia", message);
+                        try {
+                            if (onSuccess != null)
+                                onSuccess.run();
+                            status.setText(name + " completed");
+                            Dialogs.showInfoNotification("Histopia", message);
+                        } catch (RuntimeException callbackError) {
+                            status.setText(name + " failed");
+                            Dialogs.showErrorMessage(name, callbackError.getMessage());
+                        }
                     } else {
                         var cause = error.getCause() == null ? error : error.getCause();
                         if (cause instanceof CancellationException) {
@@ -557,6 +584,7 @@ final class HistopiaPanel {
         runSemantic.setDisable(running);
         runProjectRegistration.setDisable(running);
         runProjectSemantic.setDisable(running);
+        openProjectReview.setDisable(running);
         approveProjectRegistration.setDisable(running);
         export.setDisable(running);
         cancel.setDisable(!running);

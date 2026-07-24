@@ -62,4 +62,21 @@ class HistopiaCommandTest {
                 "Masks and physical order reviewed",
                 command.get(command.indexOf("--review-notes") + 1));
     }
+
+    @Test
+    void buildsRegistrationReviewPortalCommand() {
+        var command = HistopiaCommand.buildRegistrationReview(
+                "python",
+                Path.of("registration run"),
+                Path.of("review output"),
+                4);
+
+        assertEquals("histopia.visualization._cli", command.get(2));
+        assertEquals("registration-review", command.get(3));
+        assertEquals("4", command.get(command.indexOf("--workers") + 1));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaCommand.buildRegistrationReview(
+                        "python", Path.of("registration"), Path.of("review"), 0));
+    }
 }

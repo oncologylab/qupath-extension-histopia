@@ -58,6 +58,24 @@ final class HistopiaCommand {
         return moduleCommand(python, "histopia.semantic._cli", arguments);
     }
 
+    static List<String> buildRegistrationReview(
+            String python,
+            Path registrationRun,
+            Path output,
+            int workers) {
+        if (workers <= 0)
+            throw new IllegalArgumentException("Review workers must be positive");
+        return moduleCommand(
+                python,
+                "histopia.visualization._cli",
+                List.of(
+                        "registration-review",
+                        registrationRun.toAbsolutePath().toString(),
+                        output.toAbsolutePath().toString(),
+                        "--workers",
+                        Integer.toString(workers)));
+    }
+
     static List<String> approveRegistration(
             String python,
             Path registrationRun,
