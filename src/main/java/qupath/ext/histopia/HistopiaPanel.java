@@ -86,9 +86,11 @@ final class HistopiaPanel {
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
     private final Button openProjectReview = new Button("Open registration QC");
+    private final Button openProjectSemanticReview = new Button("Open semantic QC");
     private final Button approveProjectMasks = new Button("Approve masks");
     private final Button approveProjectOrder = new Button("Approve order");
     private final Button approveProjectRegistration = new Button("Seal reviewed run");
+    private final Button approveProjectSemantic = new Button("Approve semantic");
     private final Button export = new Button("Export bundle");
     private final Button cancel = new Button("Cancel");
     private final Label status = new Label("Ready");
@@ -211,6 +213,8 @@ final class HistopiaPanel {
         approveProjectOrder.setOnAction(event -> approveProjectOrder());
         approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
         openProjectReview.setOnAction(event -> openRegistrationReview());
+        openProjectSemanticReview.setOnAction(event -> openSemanticReview());
+        approveProjectSemantic.setOnAction(event -> approveProjectSemantic());
         var review = new FlowPane(
                 labeledField("Reviewer", reviewer),
                 labeledField("Review notes", reviewNotes));
@@ -224,6 +228,8 @@ final class HistopiaPanel {
                 approveProjectOrder,
                 approveProjectRegistration,
                 runProjectSemantic,
+                openProjectSemanticReview,
+                approveProjectSemantic,
                 checkCompute,
                 projectAllowModelDownload);
         var pane = new VBox(
@@ -396,7 +402,9 @@ final class HistopiaPanel {
                     HistopiaCommand.runSemantic(
                             python.getText(),
                             files.semanticConfig(),
-                            projectAllowModelDownload.isSelected()));
+                            projectAllowModelDownload.isSelected()),
+                    () -> status.setText(
+                            "Semantic atlas completed; scientific review required"));
         } catch (IOException | IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia semantic atlas", error.getMessage());
         }
@@ -447,6 +455,78 @@ final class HistopiaPanel {
                 "Registration approval",
                 "registration_result.json",
                 HistopiaCommand::approveRegistration);
+    }
+
+    private void openSemanticReview() {
+        try {
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var registrationRun = workspacePath.resolve("registration");
+            var semanticRun = workspacePath.resolve("semantic");
+            if (!Files.isRegularFile(semanticRun.resolve("semantic_result.json")))
+                throw new IllegalArgumentException(
+                        "Run the semantic atlas before opening semantic QC");
+            requireCurrentProjectSelection(workspacePath, registrationRun);
+            var output = workspacePath.resolve(".histopia").resolve("semantic-review");
+            startJob(
+                    "Semantic QC",
+                    HistopiaCommand.buildSemanticReview(
+                            python.getText(),
+                            registrationRun,
+                            semanticRun,
+                            output,
+                            REVIEW_WORKERS),
+                    () -> {
+                        final java.net.URI reviewUri;
+                        try {
+                            reviewUri = HistopiaLocalServer.serve(output)
+                                    .resolve("histopia/index.html");
+                        } catch (IOException error) {
+                            throw new IllegalStateException(
+                                    "Could not start the local semantic review server",
+                                    error);
+                        }
+                        if (!GuiTools.browseURI(reviewUri))
+                            throw new IllegalStateException(
+                                    "Could not open the semantic review");
+                    });
+        } catch (IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia semantic QC", error.getMessage());
+        }
+    }
+
+    private void approveProjectSemantic() {
+        try {
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var registrationRun = workspacePath.resolve("registration");
+            var semanticRun = workspacePath.resolve("semantic");
+            if (!Files.isRegularFile(semanticRun.resolve("semantic_result.json")))
+                throw new IllegalArgumentException(
+                        "Run the semantic atlas before approving it");
+            requireCurrentProjectSelection(workspacePath, registrationRun);
+            startJob(
+                    "Semantic approval",
+                    HistopiaCommand.approveSemantic(
+                            python.getText(),
+                            semanticRun,
+                            requiredText(reviewer, "Reviewer"),
+                            requiredText(reviewNotes, "Review notes")));
+        } catch (IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia semantic approval", error.getMessage());
+        }
+    }
+
+    private void requireCurrentProjectSelection(
+            Path workspacePath,
+            Path registrationRun) {
+        var selected = List.copyOf(
+                projectSlides.getSelectionModel().getSelectedItems());
+        if (!HistopiaWorkflow.selectionManifestMatches(
+                workspacePath.resolve(".histopia").resolve("qupath-selection.json"),
+                selected)
+                || !HistopiaWorkflow.registrationMatchesSelection(
+                        registrationRun, selected))
+            throw new IllegalArgumentException(
+                    "Selected project slides do not match this workflow result");
     }
 
     private void approveProjectStage(
@@ -662,9 +742,11 @@ final class HistopiaPanel {
         runProjectSemantic.setDisable(running);
         checkCompute.setDisable(running);
         openProjectReview.setDisable(running);
+        openProjectSemanticReview.setDisable(running);
         approveProjectMasks.setDisable(running);
         approveProjectOrder.setDisable(running);
         approveProjectRegistration.setDisable(running);
+        approveProjectSemantic.setDisable(running);
         export.setDisable(running);
         cancel.setDisable(!running);
         cancel.setOnAction(event -> cancelActiveJob());

@@ -25,11 +25,15 @@ semantic-atlas results.
   displaying a sealed state or launching semantic analysis
 - reject approval or semantic launch when the current QuPath selection differs
   from the prepared or sealed registration cohort
+- build and open the semantic 3D/QC viewer, then record fingerprint-bound
+  semantic approval
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
 - select one bundle manifest and automatically import the matching open slide
-- verify schema-2 annotation checksums before import
+- verify schema-2/3 annotation checksums and byte sizes before import
+- reject schema-3 bundles with stale approval, mismatched provenance, or
+  annotation paths and symlinks outside the bundle
 - preserve Histopia region classes and colors, with optional replacement of
   previous Histopia annotations
 
@@ -39,7 +43,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.3.2.jar` from the
+Download `qupath-extension-histopia-0.3.3.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -47,7 +51,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.2.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.3.jar.sha256
 ```
 
 ## Build From Source
@@ -64,8 +68,11 @@ reference, then run registration. The first run prepares masks; open QC,
 review, and choose **Approve masks**. Run again to prepare morphology-aware
 order, review it, and choose **Approve order**. A third run computes alignment.
 After reviewing it, choose **Seal reviewed run** before starting the semantic
-atlas. Runtime configs, the exact project-selection manifest, and local review
-portal are kept in `<workspace>/.histopia`.
+atlas. When semantic analysis completes, choose **Open semantic QC**, review
+the atlas, and choose **Approve semantic** before export. Runtime configs, the
+exact project-selection manifest, and local review portals are kept in
+`<workspace>/.histopia`. The semantic viewer is served only on an ephemeral
+`127.0.0.1` port so browser modules and local assets load correctly.
 
 Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
 control. **Check compute** runs `histopia-semantic doctor` in the selected

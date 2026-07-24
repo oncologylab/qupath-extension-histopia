@@ -1,5 +1,6 @@
 package qupath.ext.histopia;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
@@ -51,46 +52,72 @@ final class HistopiaBundle {
 
     static SemanticArtifact findSemanticAnnotations(Path manifest, Set<String> imageNames)
             throws IOException {
-        var manifestParent = manifest.toAbsolutePath().normalize().getParent();
+        var manifestPath = manifest.toAbsolutePath().normalize().toRealPath();
+        var manifestParent = manifestPath.getParent();
         if (manifestParent == null)
             throw new IOException("Bundle manifest has no parent directory");
         SemanticArtifact match = null;
-        try (var reader = Files.newBufferedReader(manifest)) {
+        try (var reader = Files.newBufferedReader(manifestPath)) {
             var root = JsonParser.parseReader(reader).getAsJsonObject();
-            if (!"histopia-qupath-bundle".equals(root.get("format").getAsString()))
+            if (!"histopia-qupath-bundle".equals(requiredString(root, "format")))
                 throw new IOException("Selected JSON is not a Histopia QuPath bundle");
             var schemaVersion = root.has("schema_version")
-                    ? root.get("schema_version").getAsInt()
+                    ? requiredInteger(root, "schema_version")
                     : 1;
+            if (schemaVersion < 1 || schemaVersion > 3)
+                throw new IOException("Unsupported Histopia bundle schema");
+            if (!root.has("slides") || !root.get("slides").isJsonArray())
+                throw new IOException("Histopia bundle has no slide array");
             for (var element : root.getAsJsonArray("slides")) {
+                if (!element.isJsonObject())
+                    throw new IOException("Histopia bundle slides must be objects");
                 var slide = element.getAsJsonObject();
-                var id = slide.get("id").getAsString();
+                var id = requiredString(slide, "id");
                 if (!imageNames.contains(id) || !slide.has("semantic_annotations"))
                     continue;
-                var relative = slide.get("semantic_annotations").getAsString();
+                if (schemaVersion >= 3)
+                    validateSemanticApproval(root);
+                var relative = requiredString(slide, "semantic_annotations");
                 var path = manifestParent.resolve(relative).normalize();
                 if (!path.startsWith(manifestParent))
                     throw new IOException("Bundle annotation path escapes its directory");
                 if (!Files.isRegularFile(path))
                     throw new IOException("Bundle annotation file is missing: " + relative);
+                path = path.toRealPath();
+                if (!path.startsWith(manifestParent))
+                    throw new IOException(
+                            "Bundle annotation symlink escapes its directory");
                 if (schemaVersion >= 2 && !slide.has("semantic_annotations_sha256"))
                     throw new IOException(
-                            "Schema-2 bundle annotation has no checksum: " + relative);
+                            "Bundle annotation has no checksum: " + relative);
                 if (slide.has("semantic_annotations_sha256")) {
-                    var expected = slide.get("semantic_annotations_sha256").getAsString();
+                    var expected = requiredString(
+                            slide, "semantic_annotations_sha256");
+                    if (!expected.matches("[0-9a-fA-F]{64}"))
+                        throw new IOException(
+                                "Bundle annotation checksum is malformed: " + relative);
                     var actual = sha256(path);
                     if (!actual.equalsIgnoreCase(expected))
                         throw new IOException(
                                 "Bundle annotation checksum does not match: " + relative);
+                }
+                if (schemaVersion >= 2) {
+                    var expectedBytes = requiredNonnegativeLong(
+                            slide, "semantic_annotations_bytes");
+                    if (Files.size(path) != expectedBytes)
+                        throw new IOException(
+                                "Bundle annotation byte size does not match: " + relative);
                 }
                 if (match != null)
                     throw new IOException(
                             "Multiple bundle slides match the open image; use unique image names");
                 match = new SemanticArtifact(
                         path,
-                        optionalInt(slide, "semantic_annotation_classes"),
-                        optionalInt(slide, "semantic_annotation_regions"),
-                        optionalInt(slide, "semantic_patch_count"));
+                        optionalNonnegativeInteger(
+                                slide, "semantic_annotation_classes"),
+                        optionalNonnegativeInteger(
+                                slide, "semantic_annotation_regions"),
+                        optionalNonnegativeInteger(slide, "semantic_patch_count"));
             }
         } catch (RuntimeException error) {
             throw new IOException("Histopia bundle manifest is malformed", error);
@@ -101,8 +128,75 @@ final class HistopiaBundle {
         return match;
     }
 
-    private static int optionalInt(com.google.gson.JsonObject object, String name) {
-        return object.has(name) ? object.get(name).getAsInt() : -1;
+    private static void validateSemanticApproval(JsonObject root) throws IOException {
+        var fingerprint = requiredString(root, "semantic_fingerprint");
+        requiredString(root, "semantic_preflight_fingerprint");
+        if (!root.has("semantic_approval")
+                || !root.get("semantic_approval").isJsonObject())
+            throw new IOException("Schema-3 bundle has no semantic approval");
+        var approval = root.getAsJsonObject("semantic_approval");
+        if (!fingerprint.equals(requiredString(approval, "fingerprint")))
+            throw new IOException("Schema-3 semantic approval fingerprint is stale");
+        requiredString(approval, "reviewer");
+        if (approval.has("reviewed_at")
+                && !approval.get("reviewed_at").isJsonNull())
+            requiredString(approval, "reviewed_at");
+    }
+
+    private static String requiredString(JsonObject object, String name)
+            throws IOException {
+        var value = object.get(name);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isString()
+                || value.getAsString().isBlank())
+            throw new IOException("Histopia bundle contains an invalid " + name);
+        return value.getAsString();
+    }
+
+    private static int requiredInteger(JsonObject object, String name)
+            throws IOException {
+        var value = object.get(name);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isNumber())
+            throw new IOException("Histopia bundle contains an invalid " + name);
+        try {
+            return value.getAsBigDecimal().intValueExact();
+        } catch (ArithmeticException error) {
+            throw new IOException("Histopia bundle contains an invalid " + name, error);
+        }
+    }
+
+    private static int requiredNonnegativeInteger(JsonObject object, String name)
+            throws IOException {
+        var value = requiredInteger(object, name);
+        if (value < 0)
+            throw new IOException("Histopia bundle contains a negative " + name);
+        return value;
+    }
+
+    private static long requiredNonnegativeLong(JsonObject object, String name)
+            throws IOException {
+        var value = object.get(name);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isNumber())
+            throw new IOException("Histopia bundle contains an invalid " + name);
+        final long parsed;
+        try {
+            parsed = value.getAsBigDecimal().longValueExact();
+        } catch (ArithmeticException error) {
+            throw new IOException("Histopia bundle contains an invalid " + name, error);
+        }
+        if (parsed < 0)
+            throw new IOException("Histopia bundle contains a negative " + name);
+        return parsed;
+    }
+
+    private static int optionalNonnegativeInteger(JsonObject object, String name)
+            throws IOException {
+        return object.has(name) ? requiredNonnegativeInteger(object, name) : -1;
     }
 
     private static String sha256(Path path) throws IOException {

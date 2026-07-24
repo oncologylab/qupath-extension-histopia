@@ -105,4 +105,31 @@ class HistopiaCommandTest {
                 () -> HistopiaCommand.buildRegistrationReview(
                         "python", Path.of("registration"), Path.of("review"), 0));
     }
+
+    @Test
+    void buildsSemanticReviewAndApprovalCommands() {
+        var review = HistopiaCommand.buildSemanticReview(
+                "python",
+                Path.of("registration run"),
+                Path.of("semantic run"),
+                Path.of("review output"),
+                3);
+        var approval = HistopiaCommand.approveSemantic(
+                "python",
+                Path.of("semantic run"),
+                "Reviewer Name",
+                "Reviewed K sensitivity and topology");
+
+        assertEquals("histopia.visualization._cli", review.get(2));
+        assertEquals("build", review.get(3));
+        assertEquals(
+                "qupath=" + Path.of("semantic run").toAbsolutePath(),
+                review.get(review.indexOf("--semantic-run") + 1));
+        assertEquals("3", review.get(review.indexOf("--workers") + 1));
+        assertEquals("histopia.semantic._cli", approval.get(2));
+        assertEquals("approve", approval.get(3));
+        assertEquals(
+                "Reviewer Name",
+                approval.get(approval.indexOf("--reviewer") + 1));
+    }
 }
