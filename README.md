@@ -19,6 +19,8 @@ semantic-atlas results.
 - build and open one local staged mask/order QC portal
 - record separate fingerprint-bound mask and order approvals before final
   registration sealing
+- verify the final seal's artifact checksums and review fingerprint before
+  displaying a sealed state or launching semantic analysis
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
@@ -33,7 +35,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.3.0.jar` from the
+Download `qupath-extension-histopia-0.3.1.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -41,7 +43,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.0.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.1.jar.sha256
 ```
 
 ## Build From Source

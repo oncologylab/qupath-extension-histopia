@@ -1,16 +1,23 @@
 package qupath.ext.histopia;
 
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class HistopiaWorkflowTest {
 
@@ -136,7 +143,79 @@ class HistopiaWorkflowTest {
                 HistopiaWorkflow.registrationStatus(run));
         Files.writeString(run.resolve("registration_approval.json"), "{}");
         assertEquals(
-                "Registration sealed",
+                "Registration seal stale; final review required",
                 HistopiaWorkflow.registrationStatus(run));
+        assertFalse(HistopiaWorkflow.registrationSealValid(run));
+    }
+
+    @Test
+    void acceptsOnlyExactFingerprintBoundRegistrationSeal() throws Exception {
+        var run = tempDir.resolve("registration");
+        Files.createDirectories(run);
+        var result = new JsonObject();
+        var slides = new JsonArray();
+        var slide = new JsonObject();
+        var maskReview = new JsonObject();
+        maskReview.addProperty("status", "auto_pass");
+        slide.add("mask_review", maskReview);
+        slides.add(slide);
+        result.add("slides", slides);
+        var masks = new JsonObject();
+        masks.add("slides", new JsonArray());
+        var order = new JsonObject();
+        order.addProperty("approved", true);
+        order.addProperty("fingerprint", "order-fingerprint");
+        var gson = new GsonBuilder().setPrettyPrinting().create();
+        Files.writeString(run.resolve("registration_result.json"), gson.toJson(result));
+        Files.writeString(run.resolve("mask_review.json"), gson.toJson(masks));
+        Files.writeString(run.resolve("section_order_review.json"), gson.toJson(order));
+
+        var artifacts = new JsonObject();
+        for (var name : List.of(
+                "registration_result.json",
+                "mask_review.json",
+                "section_order_review.json"))
+            artifacts.addProperty(name, sha256(run.resolve(name)));
+        var approval = new JsonObject();
+        approval.addProperty("schema_version", 1);
+        approval.addProperty("reviewer", "Reviewer");
+        approval.addProperty("reviewed_at", "2026-07-24T20:00:00+00:00");
+        approval.addProperty("slide_count", 1);
+        approval.addProperty("order_fingerprint", "order-fingerprint");
+        approval.add("artifacts", artifacts);
+        approval.addProperty("slide_count", "1");
+        Files.writeString(run.resolve("registration_approval.json"), gson.toJson(approval));
+        assertFalse(HistopiaWorkflow.registrationSealValid(run));
+
+        approval.addProperty("slide_count", 1);
+        Files.writeString(run.resolve("registration_approval.json"), gson.toJson(approval));
+
+        assertTrue(HistopiaWorkflow.registrationSealValid(run));
+        assertEquals("Registration sealed", HistopiaWorkflow.registrationStatus(run));
+
+        Files.writeString(
+                run.resolve("registration_result.json"),
+                Files.readString(run.resolve("registration_result.json")) + System.lineSeparator());
+        assertFalse(HistopiaWorkflow.registrationSealValid(run));
+        assertEquals(
+                "Registration seal stale; final review required",
+                HistopiaWorkflow.registrationStatus(run));
+    }
+
+    @Test
+    void validatesExternalRegistrationSealWhenConfigured() {
+        var configured = System.getenv("HISTOPIA_VALIDATED_REGISTRATION_RUN");
+        assumeTrue(configured != null && !configured.isBlank());
+
+        var run = Path.of(configured);
+
+        assertTrue(HistopiaWorkflow.registrationSealValid(run));
+        assertEquals("Registration sealed", HistopiaWorkflow.registrationStatus(run));
+    }
+
+    private static String sha256(Path path) throws Exception {
+        var digest = MessageDigest.getInstance("SHA-256")
+                .digest(Files.readAllBytes(path));
+        return HexFormat.of().formatHex(digest);
     }
 }

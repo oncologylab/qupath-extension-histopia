@@ -3,15 +3,20 @@ package qupath.ext.histopia;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import qupath.lib.projects.Project;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -20,6 +25,12 @@ final class HistopiaWorkflow {
 
     private static final Set<String> WSI_EXTENSIONS =
             Set.of(".ndpi", ".scn", ".svs", ".tif", ".tiff");
+    private static final Set<String> REGISTRATION_SEAL_ARTIFACTS = Set.of(
+            "registration_result.json",
+            "mask_review.json",
+            "section_order_review.json");
+    private static final Set<String> APPROVED_MASK_STATUSES =
+            Set.of("auto_pass", "override_pass");
 
     private HistopiaWorkflow() {
     }
@@ -210,7 +221,9 @@ final class HistopiaWorkflow {
 
     static String registrationStatus(Path registrationRun) {
         if (Files.isRegularFile(registrationRun.resolve("registration_approval.json")))
-            return "Registration sealed";
+            return registrationSealValid(registrationRun)
+                    ? "Registration sealed"
+                    : "Registration seal stale; final review required";
         if (Files.isRegularFile(registrationRun.resolve("registration_result.json")))
             return "Registration completed; final review required";
         if (Files.isRegularFile(registrationRun.resolve("section_order_review.json")))
@@ -218,6 +231,106 @@ final class HistopiaWorkflow {
         if (Files.isRegularFile(registrationRun.resolve("mask_review.json")))
             return "Tissue mask review required";
         return "Registration completed without review artifacts";
+    }
+
+    static boolean registrationSealValid(Path registrationRun) {
+        try {
+            var approval = readObject(registrationRun.resolve("registration_approval.json"));
+            if (!hasIntegerValue(approval, "schema_version", 1))
+                return false;
+            var artifacts = approval.getAsJsonObject("artifacts");
+            if (artifacts == null || !artifacts.keySet().equals(REGISTRATION_SEAL_ARTIFACTS))
+                return false;
+            for (var name : REGISTRATION_SEAL_ARTIFACTS) {
+                if (!hasNonblankString(artifacts, name))
+                    return false;
+                var artifact = registrationRun.resolve(name);
+                if (!Files.isRegularFile(artifact)
+                        || !sha256(artifact).equals(artifacts.get(name).getAsString()))
+                    return false;
+            }
+
+            var order = readObject(registrationRun.resolve("section_order_review.json"));
+            if (!hasBooleanValue(order, "approved", true)
+                    || !hasNonblankString(order, "fingerprint")
+                    || !hasNonblankString(approval, "order_fingerprint")
+                    || !order.get("fingerprint").getAsString()
+                            .equals(approval.get("order_fingerprint").getAsString()))
+                return false;
+
+            var result = readObject(registrationRun.resolve("registration_result.json"));
+            var slides = result.getAsJsonArray("slides");
+            if (slides == null
+                    || slides.isEmpty()
+                    || !hasIntegerValue(approval, "slide_count", slides.size()))
+                return false;
+            for (var element : slides) {
+                if (!element.isJsonObject())
+                    return false;
+                var maskReview = element.getAsJsonObject().getAsJsonObject("mask_review");
+                if (maskReview == null
+                        || !hasNonblankString(maskReview, "status")
+                        || !APPROVED_MASK_STATUSES.contains(
+                                maskReview.get("status").getAsString()))
+                    return false;
+            }
+            return hasNonblankString(approval, "reviewer")
+                    && hasNonblankString(approval, "reviewed_at");
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
+    }
+
+    private static JsonObject readObject(Path path) throws IOException {
+        var element = JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8));
+        if (!element.isJsonObject())
+            throw new IllegalArgumentException("JSON root must be an object: " + path);
+        return element.getAsJsonObject();
+    }
+
+    private static boolean hasNonblankString(JsonObject object, String key) {
+        var value = object.get(key);
+        return value != null
+                && value.isJsonPrimitive()
+                && value.getAsJsonPrimitive().isString()
+                && !value.getAsString().isBlank();
+    }
+
+    private static boolean hasIntegerValue(JsonObject object, String key, int expected) {
+        var value = object.get(key);
+        return value != null
+                && value.isJsonPrimitive()
+                && value.getAsJsonPrimitive().isNumber()
+                && value.getAsBigDecimal().compareTo(java.math.BigDecimal.valueOf(expected)) == 0;
+    }
+
+    private static boolean hasBooleanValue(
+            JsonObject object,
+            String key,
+            boolean expected) {
+        var value = object.get(key);
+        return value != null
+                && value.isJsonPrimitive()
+                && value.getAsJsonPrimitive().isBoolean()
+                && value.getAsBoolean() == expected;
+    }
+
+    private static String sha256(Path path) throws IOException {
+        final MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 is unavailable", error);
+        }
+        try (InputStream input = Files.newInputStream(path)) {
+            var buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count > 0)
+                    digest.update(buffer, 0, count);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     private static Path localWsiPath(URI uri) {

@@ -377,10 +377,10 @@ final class HistopiaPanel {
         try {
             requiredPath(modelCache, "UNI2-h model cache");
             var files = prepareProjectWorkflow();
-            if (!Files.isRegularFile(
-                    files.registrationRun().resolve("registration_approval.json")))
+            if (!HistopiaWorkflow.registrationSealValid(files.registrationRun()))
                 throw new IllegalArgumentException(
-                        "Seal the reviewed registration before semantic analysis");
+                        "Registration seal is missing or stale; review and seal "
+                                + "the exact current result before semantic analysis");
             startJob(
                     "Semantic atlas",
                     HistopiaCommand.runSemantic(
