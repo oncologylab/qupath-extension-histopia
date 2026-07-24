@@ -2,9 +2,47 @@ name: Make draft release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to create, for example v0.1.0
+        required: true
+        type: string
 
 jobs:
   build:
+    uses: qupath/actions/.github/workflows/gradle.yml@main
+    with:
+      artifact-name: qupath-extension-histopia-release
+      artifact-path: build/libs/qupath-extension-histopia-0.1.0.jar
+
+  release:
+    needs: build
     permissions:
       contents: write
-    uses: qupath/actions/.github/workflows/github-release.yml@main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: qupath-extension-histopia-release
+
+      - name: Validate tag and create checksum
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          test "$RELEASE_TAG" = "v0.1.0"
+          sha256sum qupath-extension-histopia-0.1.0.jar \
+            > qupath-extension-histopia-0.1.0.jar.sha256
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --draft \
+            --generate-notes \
+            --title "Histopia for QuPath 0.1.0" \
+            qupath-extension-histopia-0.1.0.jar \
+            qupath-extension-histopia-0.1.0.jar.sha256

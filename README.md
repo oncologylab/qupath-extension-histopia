@@ -1,5 +1,8 @@
 # Histopia for QuPath
 
+[![Build](https://github.com/oncologylab/qupath-extension-histopia/actions/workflows/build.yml/badge.svg)](https://github.com/oncologylab/qupath-extension-histopia/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/oncologylab/qupath-extension-histopia?include_prereleases)](https://github.com/oncologylab/qupath-extension-histopia/releases)
+
 The Histopia extension connects QuPath 0.7 to
 [Histopia](https://github.com/oncologylab/histopia) registration and global
 semantic-atlas results.
@@ -20,14 +23,26 @@ The extension does not run registration or UNI2-h inside QuPath's JVM. It calls
 the selected Python installation, where `histopia` and the required optional
 dependencies must already be installed.
 
-## Build
+## Install
+
+Download `qupath-extension-histopia-0.1.0.jar` from the
+[latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
+Drag the JAR onto QuPath 0.7, restart QuPath, then open
+**Extensions > Histopia > Open Histopia tools**.
+
+The release also includes a SHA-256 checksum file. Verify it before installing:
+
+```bash
+sha256sum --check qupath-extension-histopia-0.1.0.jar.sha256
+```
+
+## Build From Source
 
 ```bash
 ./gradlew build
 ```
 
-Install the JAR from `build/libs` using QuPath's extension manager or by
-dragging it into QuPath. Open **Extensions > Histopia > Open Histopia tools**.
+The installable JAR is written under `build/libs`.
 
 The **Run analysis** tab accepts Histopia TOML or JSON configs for registration
 and semantic analysis. The **Export and import** tab writes a QuPath bundle,
