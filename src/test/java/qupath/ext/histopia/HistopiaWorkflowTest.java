@@ -91,4 +91,23 @@ class HistopiaWorkflowTest {
                         32,
                         1));
     }
+
+    @Test
+    void choosesInitialReferenceWithoutComparingImmutableListToNull() {
+        var first = new HistopiaWorkflow.ProjectSlide(
+                "first", "First", tempDir.resolve("first.ndpi"));
+        var second = new HistopiaWorkflow.ProjectSlide(
+                "second", "Second", tempDir.resolve("second.ndpi"));
+        var selected = List.of(first, second);
+
+        assertEquals(
+                first,
+                HistopiaWorkflow.preferredReference(selected, null));
+        assertEquals(
+                second,
+                HistopiaWorkflow.preferredReference(selected, second));
+        assertEquals(
+                null,
+                HistopiaWorkflow.preferredReference(List.of(), first));
+    }
 }

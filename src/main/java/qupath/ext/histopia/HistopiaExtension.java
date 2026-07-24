@@ -39,6 +39,13 @@ public final class HistopiaExtension implements QuPathExtension {
     }
 
     @Override
+    public Version getVersion() {
+        var implementationVersion = getClass().getPackage().getImplementationVersion();
+        return Version.parse(
+                implementationVersion == null ? "0.0.0" : implementationVersion);
+    }
+
+    @Override
     public Version getQuPathVersion() {
         return Version.parse("v0.7.0");
     }

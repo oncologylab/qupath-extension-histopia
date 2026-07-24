@@ -100,14 +100,12 @@ final class HistopiaPanel {
         this.qupath = qupath;
         stage.initOwner(qupath.getStage());
         stage.setTitle("Histopia");
-        stage.setScene(new Scene(createContent()));
-        stage.setMinWidth(900);
-        stage.setMinHeight(620);
         projectSlides.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         projectSlides.getSelectionModel().getSelectedItems().addListener(
                 (ListChangeListener<HistopiaWorkflow.ProjectSlide>) change ->
                         refreshReferenceChoices());
-        projectSlides.setPrefHeight(230);
+        projectSlides.setMinHeight(80);
+        projectSlides.setPrefHeight(110);
         projectOrder.getItems().setAll(
                 "anchored_similarity", "similarity", "natural");
         projectOrder.setValue("anchored_similarity");
@@ -132,7 +130,12 @@ final class HistopiaPanel {
         cancel.setDisable(true);
         log.setEditable(false);
         log.setWrapText(false);
-        log.setPrefRowCount(10);
+        log.setMinHeight(50);
+        log.setPrefHeight(80);
+        log.setMaxHeight(120);
+        stage.setScene(new Scene(createContent(), 980, 760));
+        stage.setMinWidth(900);
+        stage.setMinHeight(620);
     }
 
     void show() {
@@ -180,7 +183,7 @@ final class HistopiaPanel {
         addDirectoryRow(paths, 0, "Analysis workspace", workspace, null);
         addDirectoryRow(paths, 1, "UNI2-h model cache", modelCache, null);
         paths.add(new Label("Reference"), 0, 2);
-        paths.add(new VBox(4, automaticReference, projectReference), 1, 2);
+        paths.add(new HBox(8, automaticReference, projectReference), 1, 2);
         paths.add(new Label("Section order"), 0, 3);
         paths.add(projectOrder, 1, 3);
 
@@ -254,9 +257,9 @@ final class HistopiaPanel {
 
     private static GridPane configuredGrid() {
         var grid = new GridPane();
-        grid.setPadding(new Insets(16));
+        grid.setPadding(new Insets(10));
         grid.setHgap(8);
-        grid.setVgap(10);
+        grid.setVgap(8);
         return grid;
     }
 
@@ -345,10 +348,8 @@ final class HistopiaPanel {
         var selected = List.copyOf(
                 projectSlides.getSelectionModel().getSelectedItems());
         projectReference.getItems().setAll(selected);
-        if (selected.contains(previous))
-            projectReference.setValue(previous);
-        else if (!selected.isEmpty())
-            projectReference.setValue(selected.get(0));
+        projectReference.setValue(
+                HistopiaWorkflow.preferredReference(selected, previous));
     }
 
     private void startProjectRegistration() {

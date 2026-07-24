@@ -78,6 +78,14 @@ final class HistopiaWorkflow {
         return new ProjectSelection(slides, warnings);
     }
 
+    static ProjectSlide preferredReference(
+            List<ProjectSlide> selected,
+            ProjectSlide previous) {
+        if (previous != null && selected.contains(previous))
+            return previous;
+        return selected.isEmpty() ? null : selected.get(0);
+    }
+
     static WorkflowFiles writeConfigs(
             Path workspace,
             List<ProjectSlide> slides,
