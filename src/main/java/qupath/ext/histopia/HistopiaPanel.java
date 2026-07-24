@@ -15,6 +15,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -64,6 +65,7 @@ final class HistopiaPanel {
     private final TextField clusterMax = new TextField("15");
     private final TextField semanticBatchSize = new TextField("64");
     private final TextField patchWorkers = new TextField("1");
+    private final TextField vipsThreads = new TextField();
     private final TextField reviewer = new TextField();
     private final TextField reviewNotes = new TextField();
     private final CheckBox automaticReference = new CheckBox("Choose reference automatically");
@@ -119,6 +121,9 @@ final class HistopiaPanel {
         semanticDevice.getItems().setAll("auto", "cpu", "cuda", "cuda:0", "mps");
         semanticDevice.setEditable(true);
         semanticDevice.setValue("auto");
+        vipsThreads.setPromptText("adaptive");
+        vipsThreads.setTooltip(new Tooltip(
+                "Optional native libvips worker cap; leave blank for adaptive"));
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
         automaticReference.selectedProperty().addListener(
@@ -202,7 +207,8 @@ final class HistopiaPanel {
                 labeledField("K min", clusterMin),
                 labeledField("K max", clusterMax),
                 labeledField("Batch", semanticBatchSize),
-                labeledField("Patch workers", patchWorkers));
+                labeledField("Patch workers", patchWorkers),
+                labeledField("VIPS threads", vipsThreads));
         settings.setHgap(8);
         settings.setVgap(6);
         settings.setPrefWrapLength(820);
@@ -576,7 +582,8 @@ final class HistopiaPanel {
                 positiveInteger(clusterMin, "K min"),
                 positiveInteger(clusterMax, "K max"),
                 positiveInteger(semanticBatchSize, "Semantic batch size"),
-                positiveInteger(patchWorkers, "Patch workers"));
+                positiveInteger(patchWorkers, "Patch workers"),
+                optionalPositiveInteger(vipsThreads, "VIPS threads"));
         registrationConfig.setText(files.registrationConfig().toString());
         semanticConfig.setText(files.semanticConfig().toString());
         registration.setText(files.registrationRun().toString());
@@ -847,6 +854,12 @@ final class HistopiaPanel {
         } catch (NumberFormatException error) {
             throw new IllegalArgumentException(name + " must be a positive integer");
         }
+    }
+
+    private static Integer optionalPositiveInteger(TextField field, String name) {
+        if (field.getText() == null || field.getText().isBlank())
+            return null;
+        return positiveInteger(field, name);
     }
 
     private static String requiredText(TextField field, String name) {

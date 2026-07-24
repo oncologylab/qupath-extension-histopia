@@ -44,7 +44,8 @@ class HistopiaWorkflowTest {
                 5,
                 12,
                 32,
-                2);
+                2,
+                4);
 
         var registration = JsonParser.parseString(
                 java.nio.file.Files.readString(files.registrationConfig()))
@@ -67,6 +68,7 @@ class HistopiaWorkflowTest {
                 .getAsJsonObject();
         assertEquals("cuda:1", semantic.get("device").getAsString());
         assertEquals(12, semantic.get("cluster_max").getAsInt());
+        assertEquals(4, semantic.get("vips_threads").getAsInt());
 
         var selection = JsonParser.parseString(
                 java.nio.file.Files.readString(files.selectionManifest()))
@@ -104,7 +106,60 @@ class HistopiaWorkflowTest {
                         5,
                         10,
                         32,
-                        1));
+                        1,
+                        null));
+    }
+
+    @Test
+    void rejectsNonpositiveVipsThreads() {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.ndpi"));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.writeConfigs(
+                        tempDir.resolve("analysis"),
+                        List.of(one, two),
+                        null,
+                        "natural",
+                        1200,
+                        1,
+                        null,
+                        "auto",
+                        5,
+                        10,
+                        32,
+                        1,
+                        0));
+    }
+
+    @Test
+    void omitsAdaptiveVipsThreadSetting() throws Exception {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.ndpi"));
+
+        var files = HistopiaWorkflow.writeConfigs(
+                tempDir.resolve("analysis"),
+                List.of(one, two),
+                null,
+                "natural",
+                1200,
+                1,
+                null,
+                "auto",
+                5,
+                10,
+                32,
+                1,
+                null);
+
+        var semantic = JsonParser.parseString(Files.readString(files.semanticConfig()))
+                .getAsJsonObject();
+        assertFalse(semantic.has("vips_threads"));
     }
 
     @Test
@@ -120,6 +175,9 @@ class HistopiaWorkflowTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> HistopiaWorkflow.normalizeDevice("cuda:"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeDevice("cuda:١"));
     }
 
     @Test

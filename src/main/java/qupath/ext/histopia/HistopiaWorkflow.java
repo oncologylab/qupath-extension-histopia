@@ -103,7 +103,7 @@ final class HistopiaWorkflow {
             throw new IllegalArgumentException("Semantic device must not be blank");
         var normalized = device.strip().toLowerCase(Locale.ROOT);
         if (Set.of("auto", "cpu", "cuda", "mps").contains(normalized)
-                || normalized.matches("cuda:\\d+"))
+                || normalized.matches("cuda:[0-9]+"))
             return normalized;
         throw new IllegalArgumentException(
                 "Semantic device must be auto, cpu, cuda, cuda:N, or mps");
@@ -121,7 +121,8 @@ final class HistopiaWorkflow {
             int clusterMin,
             int clusterMax,
             int batchSize,
-            int patchWorkers) throws IOException {
+            int patchWorkers,
+            Integer vipsThreads) throws IOException {
         if (slides.size() < 2)
             throw new IllegalArgumentException("Select at least two project slides");
         if (reference != null && !slides.contains(reference))
@@ -130,6 +131,8 @@ final class HistopiaWorkflow {
         requirePositive(workers, "Registration workers");
         requirePositive(batchSize, "Semantic batch size");
         requirePositive(patchWorkers, "Patch workers");
+        if (vipsThreads != null)
+            requirePositive(vipsThreads, "VIPS threads");
         if (clusterMin <= 1 || clusterMax < clusterMin)
             throw new IllegalArgumentException("Semantic K range is invalid");
         var duplicate = slides.stream()
@@ -185,6 +188,8 @@ final class HistopiaWorkflow {
         semantic.addProperty("cluster_max", clusterMax);
         semantic.addProperty("batch_size", batchSize);
         semantic.addProperty("patch_workers", patchWorkers);
+        if (vipsThreads != null)
+            semantic.addProperty("vips_threads", vipsThreads);
 
         var selection = new JsonObject();
         selection.addProperty("format", "histopia-qupath-selection");
