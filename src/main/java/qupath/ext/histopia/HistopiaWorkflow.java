@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -97,6 +98,17 @@ final class HistopiaWorkflow {
         return selected.isEmpty() ? null : selected.get(0);
     }
 
+    static String normalizeDevice(String device) {
+        if (device == null)
+            throw new IllegalArgumentException("Semantic device must not be blank");
+        var normalized = device.strip().toLowerCase(Locale.ROOT);
+        if (Set.of("auto", "cpu", "cuda", "mps").contains(normalized)
+                || normalized.matches("cuda:\\d+"))
+            return normalized;
+        throw new IllegalArgumentException(
+                "Semantic device must be auto, cpu, cuda, cuda:N, or mps");
+    }
+
     static WorkflowFiles writeConfigs(
             Path workspace,
             List<ProjectSlide> slides,
@@ -168,7 +180,7 @@ final class HistopiaWorkflow {
         if (modelCache != null)
             semantic.addProperty(
                     "model_cache_dir", modelCache.toAbsolutePath().normalize().toString());
-        semantic.addProperty("device", device);
+        semantic.addProperty("device", normalizeDevice(device));
         semantic.addProperty("cluster_min", clusterMin);
         semantic.addProperty("cluster_max", clusterMax);
         semantic.addProperty("batch_size", batchSize);
@@ -276,6 +288,89 @@ final class HistopiaWorkflow {
             }
             return hasNonblankString(approval, "reviewer")
                     && hasNonblankString(approval, "reviewed_at");
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
+    }
+
+    static boolean registrationMatchesSelection(
+            Path registrationRun,
+            List<ProjectSlide> selectedSlides) {
+        if (selectedSlides.size() < 2)
+            return false;
+        var expected = new HashSet<Path>();
+        for (var slide : selectedSlides) {
+            if (!expected.add(slide.path()))
+                return false;
+        }
+        try {
+            var result = readObject(registrationRun.resolve("registration_result.json"));
+            var slides = result.getAsJsonArray("slides");
+            if (slides == null || slides.size() != expected.size())
+                return false;
+            var actual = new HashSet<Path>();
+            for (var element : slides) {
+                if (!element.isJsonObject())
+                    return false;
+                var row = element.getAsJsonObject();
+                if (!hasNonblankString(row, "path"))
+                    return false;
+                final Path path;
+                try {
+                    path = Path.of(row.get("path").getAsString())
+                            .toAbsolutePath()
+                            .normalize();
+                } catch (RuntimeException error) {
+                    return false;
+                }
+                if (!actual.add(path))
+                    return false;
+            }
+            return actual.equals(expected);
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
+    }
+
+    static boolean selectionManifestMatches(
+            Path selectionManifest,
+            List<ProjectSlide> selectedSlides) {
+        if (selectedSlides.size() < 2)
+            return false;
+        var expected = new HashSet<Path>();
+        for (var slide : selectedSlides) {
+            if (!expected.add(slide.path()))
+                return false;
+        }
+        try {
+            var manifest = readObject(selectionManifest);
+            if (!hasIntegerValue(manifest, "schema_version", 1)
+                    || !hasNonblankString(manifest, "format")
+                    || !"histopia-qupath-selection".equals(
+                            manifest.get("format").getAsString()))
+                return false;
+            var slides = manifest.getAsJsonArray("slides");
+            if (slides == null || slides.size() != expected.size())
+                return false;
+            var actual = new HashSet<Path>();
+            for (var element : slides) {
+                if (!element.isJsonObject())
+                    return false;
+                var row = element.getAsJsonObject();
+                if (!hasNonblankString(row, "source_path"))
+                    return false;
+                final Path path;
+                try {
+                    path = Path.of(row.get("source_path").getAsString())
+                            .toAbsolutePath()
+                            .normalize();
+                } catch (RuntimeException error) {
+                    return false;
+                }
+                if (!actual.add(path))
+                    return false;
+            }
+            return actual.equals(expected);
         } catch (IOException | RuntimeException error) {
             return false;
         }

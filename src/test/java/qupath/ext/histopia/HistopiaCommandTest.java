@@ -49,6 +49,18 @@ class HistopiaCommandTest {
     }
 
     @Test
+    void buildsComputeInspectionForExplicitGpu() {
+        var command = HistopiaCommand.inspectCompute("python", " CUDA:2 ");
+
+        assertEquals("histopia.semantic._cli", command.get(2));
+        assertEquals("doctor", command.get(3));
+        assertEquals("cuda:2", command.get(command.indexOf("--device") + 1));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaCommand.inspectCompute("python", "gpu"));
+    }
+
+    @Test
     void buildsRegistrationApprovalWithoutShellInterpolation() {
         var command = HistopiaCommand.approveRegistration(
                 "python",

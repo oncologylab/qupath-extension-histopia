@@ -61,6 +61,13 @@ final class HistopiaCommand {
         return moduleCommand(python, "histopia.semantic._cli", arguments);
     }
 
+    static List<String> inspectCompute(String python, String device) {
+        return moduleCommand(
+                python,
+                "histopia.semantic._cli",
+                List.of("doctor", "--device", HistopiaWorkflow.normalizeDevice(device)));
+    }
+
     static List<String> buildRegistrationReview(
             String python,
             Path registrationRun,

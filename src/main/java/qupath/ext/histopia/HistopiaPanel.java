@@ -82,6 +82,7 @@ final class HistopiaPanel {
     private final ComboBox<Integer> clusters = new ComboBox<>();
     private final Button runRegistration = new Button("Run registration");
     private final Button runSemantic = new Button("Run semantic atlas");
+    private final Button checkCompute = new Button("Check compute");
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
     private final Button openProjectReview = new Button("Open registration QC");
@@ -113,7 +114,8 @@ final class HistopiaPanel {
         projectOrder.getItems().setAll(
                 "anchored_similarity", "similarity", "natural");
         projectOrder.setValue("anchored_similarity");
-        semanticDevice.getItems().setAll("auto", "cpu", "cuda", "mps");
+        semanticDevice.getItems().setAll("auto", "cpu", "cuda", "cuda:0", "mps");
+        semanticDevice.setEditable(true);
         semanticDevice.setValue("auto");
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
@@ -204,6 +206,7 @@ final class HistopiaPanel {
         settings.setPrefWrapLength(820);
         runProjectRegistration.setOnAction(event -> startProjectRegistration());
         runProjectSemantic.setOnAction(event -> startProjectSemantic());
+        checkCompute.setOnAction(event -> inspectCompute());
         approveProjectMasks.setOnAction(event -> approveProjectMasks());
         approveProjectOrder.setOnAction(event -> approveProjectOrder());
         approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
@@ -221,6 +224,7 @@ final class HistopiaPanel {
                 approveProjectOrder,
                 approveProjectRegistration,
                 runProjectSemantic,
+                checkCompute,
                 projectAllowModelDownload);
         var pane = new VBox(
                 8, selectionHeader, projectSlides, paths, settings, review, actions);
@@ -381,6 +385,12 @@ final class HistopiaPanel {
                 throw new IllegalArgumentException(
                         "Registration seal is missing or stale; review and seal "
                                 + "the exact current result before semantic analysis");
+            if (!HistopiaWorkflow.registrationMatchesSelection(
+                    files.registrationRun(),
+                    List.copyOf(projectSlides.getSelectionModel().getSelectedItems())))
+                throw new IllegalArgumentException(
+                        "Selected project slides do not match the sealed registration; "
+                                + "rerun registration for this selection before semantic analysis");
             startJob(
                     "Semantic atlas",
                     HistopiaCommand.runSemantic(
@@ -444,11 +454,17 @@ final class HistopiaPanel {
             String requiredArtifact,
             ApprovalCommand command) {
         try {
-            var run = requiredPath(workspace, "Analysis workspace")
-                    .resolve("registration");
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var run = workspacePath.resolve("registration");
             if (!Files.isRegularFile(run.resolve(requiredArtifact)))
                 throw new IllegalArgumentException(
                         "Run registration to prepare " + requiredArtifact);
+            if (!HistopiaWorkflow.selectionManifestMatches(
+                    workspacePath.resolve(".histopia").resolve("qupath-selection.json"),
+                    List.copyOf(projectSlides.getSelectionModel().getSelectedItems())))
+                throw new IllegalArgumentException(
+                        "Selected project slides do not match the prepared registration; "
+                                + "select the original cohort or rerun registration");
             var reviewerName = requiredText(reviewer, "Reviewer");
             var notes = requiredText(reviewNotes, "Review notes");
             startJob(
@@ -476,7 +492,7 @@ final class HistopiaPanel {
                 positiveInteger(processedDimension, "Processed image dimension"),
                 positiveInteger(registrationWorkers, "Registration workers"),
                 optionalPath(modelCache),
-                semanticDevice.getValue(),
+                selectedSemanticDevice(),
                 positiveInteger(clusterMin, "K min"),
                 positiveInteger(clusterMax, "K max"),
                 positiveInteger(semanticBatchSize, "Semantic batch size"),
@@ -486,6 +502,25 @@ final class HistopiaPanel {
         registration.setText(files.registrationRun().toString());
         semantic.setText(files.semanticRun().toString());
         return files;
+    }
+
+    private void inspectCompute() {
+        try {
+            startJob(
+                    "Compute check",
+                    HistopiaCommand.inspectCompute(
+                            python.getText(), selectedSemanticDevice()));
+        } catch (IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia compute", error.getMessage());
+        }
+    }
+
+    private String selectedSemanticDevice() {
+        var editorValue = semanticDevice.getEditor().getText();
+        return HistopiaWorkflow.normalizeDevice(
+                editorValue == null || editorValue.isBlank()
+                        ? semanticDevice.getValue()
+                        : editorValue);
     }
 
     private void startSemantic() {
@@ -625,6 +660,7 @@ final class HistopiaPanel {
         runSemantic.setDisable(running);
         runProjectRegistration.setDisable(running);
         runProjectSemantic.setDisable(running);
+        checkCompute.setDisable(running);
         openProjectReview.setDisable(running);
         approveProjectMasks.setDisable(running);
         approveProjectOrder.setDisable(running);

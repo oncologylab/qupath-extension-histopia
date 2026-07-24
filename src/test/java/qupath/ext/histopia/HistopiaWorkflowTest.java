@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -39,7 +40,7 @@ class HistopiaWorkflowTest {
                 1200,
                 4,
                 tempDir.resolve("models"),
-                "cuda",
+                " CUDA:1 ",
                 5,
                 12,
                 32,
@@ -64,7 +65,7 @@ class HistopiaWorkflowTest {
         var semantic = JsonParser.parseString(
                 java.nio.file.Files.readString(files.semanticConfig()))
                 .getAsJsonObject();
-        assertEquals("cuda", semantic.get("device").getAsString());
+        assertEquals("cuda:1", semantic.get("device").getAsString());
         assertEquals(12, semantic.get("cluster_max").getAsInt());
 
         var selection = JsonParser.parseString(
@@ -76,6 +77,10 @@ class HistopiaWorkflowTest {
                 .get(1).getAsJsonObject().get("reference").getAsBoolean());
         assertEquals(1, selection.getAsJsonArray("slides")
                 .get(1).getAsJsonObject().get("order").getAsInt());
+        assertTrue(HistopiaWorkflow.selectionManifestMatches(
+                files.selectionManifest(), List.of(first, second)));
+        assertFalse(HistopiaWorkflow.selectionManifestMatches(
+                files.selectionManifest(), List.of(first)));
     }
 
     @Test
@@ -100,6 +105,21 @@ class HistopiaWorkflowTest {
                         10,
                         32,
                         1));
+    }
+
+    @Test
+    void validatesSemanticDeviceSyntax() {
+        assertEquals("auto", HistopiaWorkflow.normalizeDevice(" AUTO "));
+        assertEquals("cuda:12", HistopiaWorkflow.normalizeDevice(" CUDA:12 "));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeDevice("gpu"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeDevice("cuda:-1"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeDevice("cuda:"));
     }
 
     @Test
@@ -146,6 +166,85 @@ class HistopiaWorkflowTest {
                 "Registration seal stale; final review required",
                 HistopiaWorkflow.registrationStatus(run));
         assertFalse(HistopiaWorkflow.registrationSealValid(run));
+    }
+
+    @Test
+    void matchesSealedRegistrationToCurrentProjectSelection() throws Exception {
+        var run = tempDir.resolve("registration");
+        Files.createDirectories(run);
+        var first = new HistopiaWorkflow.ProjectSlide(
+                "first", "First", tempDir.resolve("slides/first.ndpi"));
+        var second = new HistopiaWorkflow.ProjectSlide(
+                "second", "Second", tempDir.resolve("slides/second.ndpi"));
+        var result = new JsonObject();
+        var slides = new JsonArray();
+        for (var slide : List.of(second, first)) {
+            var row = new JsonObject();
+            row.addProperty("path", slide.path().toString());
+            slides.add(row);
+        }
+        result.add("slides", slides);
+        Files.writeString(
+                run.resolve("registration_result.json"),
+                new GsonBuilder().create().toJson(result));
+
+        assertTrue(HistopiaWorkflow.registrationMatchesSelection(
+                run, List.of(first, second)));
+        assertFalse(HistopiaWorkflow.registrationMatchesSelection(
+                run, List.of(first)));
+        assertFalse(HistopiaWorkflow.registrationMatchesSelection(
+                run,
+                List.of(
+                        first,
+                        new HistopiaWorkflow.ProjectSlide(
+                                "third", "Third", tempDir.resolve("slides/third.ndpi")))));
+        assertFalse(HistopiaWorkflow.registrationMatchesSelection(
+                run, List.of(first, first)));
+
+        slides.get(0).getAsJsonObject().addProperty("path", first.path().toString());
+        Files.writeString(
+                run.resolve("registration_result.json"),
+                new GsonBuilder().create().toJson(result));
+        assertFalse(HistopiaWorkflow.registrationMatchesSelection(
+                run, List.of(first, second)));
+    }
+
+    @Test
+    void rejectsChangedOrMalformedPreparedSelection() throws Exception {
+        var first = new HistopiaWorkflow.ProjectSlide(
+                "first", "First", tempDir.resolve("slides/first.ndpi"));
+        var second = new HistopiaWorkflow.ProjectSlide(
+                "second", "Second", tempDir.resolve("slides/second.ndpi"));
+        var manifest = tempDir.resolve("selection.json");
+        Files.writeString(
+                manifest,
+                """
+                {
+                  "format": "histopia-qupath-selection",
+                  "schema_version": 1,
+                  "slides": [
+                    {"source_path": "%s"},
+                    {"source_path": "%s"}
+                  ]
+                }
+                """.formatted(first.path(), second.path()));
+
+        assertTrue(HistopiaWorkflow.selectionManifestMatches(
+                manifest, List.of(second, first)));
+        assertFalse(HistopiaWorkflow.selectionManifestMatches(
+                manifest,
+                List.of(
+                        first,
+                        new HistopiaWorkflow.ProjectSlide(
+                                "third", "Third", tempDir.resolve("slides/third.ndpi")))));
+
+        Files.writeString(
+                manifest,
+                """
+                {"format":"histopia-qupath-selection","schema_version":"1","slides":[]}
+                """);
+        assertFalse(HistopiaWorkflow.selectionManifestMatches(
+                manifest, List.of(first, second)));
     }
 
     @Test
@@ -203,14 +302,27 @@ class HistopiaWorkflowTest {
     }
 
     @Test
-    void validatesExternalRegistrationSealWhenConfigured() {
+    void validatesExternalRegistrationSealWhenConfigured() throws Exception {
         var configured = System.getenv("HISTOPIA_VALIDATED_REGISTRATION_RUN");
         assumeTrue(configured != null && !configured.isBlank());
 
         var run = Path.of(configured);
+        var result = JsonParser.parseString(
+                Files.readString(run.resolve("registration_result.json")))
+                .getAsJsonObject();
+        var selected = new ArrayList<HistopiaWorkflow.ProjectSlide>();
+        var slides = result.getAsJsonArray("slides");
+        for (int index = slides.size() - 1; index >= 0; index--) {
+            var path = Path.of(slides.get(index).getAsJsonObject().get("path").getAsString());
+            selected.add(new HistopiaWorkflow.ProjectSlide(
+                    Integer.toString(index), path.getFileName().toString(), path));
+        }
 
         assertTrue(HistopiaWorkflow.registrationSealValid(run));
         assertEquals("Registration sealed", HistopiaWorkflow.registrationStatus(run));
+        assertTrue(HistopiaWorkflow.registrationMatchesSelection(run, selected));
+        assertFalse(HistopiaWorkflow.registrationMatchesSelection(
+                run, selected.subList(1, selected.size())));
     }
 
     private static String sha256(Path path) throws Exception {
