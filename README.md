@@ -6,11 +6,15 @@ semantic-atlas results.
 
 ## Capabilities
 
-- launch a validated Histopia interchange export without blocking QuPath
+- run registration and global semantic-atlas configs without blocking QuPath
+- stream Python progress and cancel the active process
+- launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
-- choose any K available in the semantic result
+- discover every available K and default to Histopia's selected K
 - select one bundle manifest and automatically import the matching open slide
-- preserve Histopia region classes and colors
+- verify schema-2 annotation checksums before import
+- preserve Histopia region classes and colors, with optional replacement of
+  previous Histopia annotations
 
 The extension does not run registration or UNI2-h inside QuPath's JVM. It calls
 the selected Python installation, where `histopia` and the required optional
@@ -25,9 +29,20 @@ dependencies must already be installed.
 Install the JAR from `build/libs` using QuPath's extension manager or by
 dragging it into QuPath. Open **Extensions > Histopia > Open Histopia tools**.
 
+The **Run analysis** tab accepts Histopia TOML or JSON configs for registration
+and semantic analysis. The **Export and import** tab writes a QuPath bundle,
+loads the available semantic K values, and imports annotations for the
+currently open matching source slide.
+
 Semantic annotations are exported in original WSI pixel coordinates. Histopia
 thumbnail registration matrices are included as provenance and are not applied
-directly to QuPath native coordinates.
+directly to QuPath native coordinates. Adjacent same-class patches are
+losslessly coalesced by default to reduce GeoJSON size and QuPath geometry
+overhead; the Python CLI retains a one-tile-per-patch audit mode.
+
+See the
+[Histopia QuPath integration guide](https://github.com/oncologylab/histopia/blob/main/docs/qupath.md)
+for Python installation, bundle guarantees, and CLI usage.
 
 ## Requirements
 
