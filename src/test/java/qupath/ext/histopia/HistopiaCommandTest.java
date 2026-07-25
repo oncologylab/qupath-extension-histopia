@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HistopiaCommandTest {
 
@@ -131,5 +133,21 @@ class HistopiaCommandTest {
         assertEquals(
                 "Reviewer Name",
                 approval.get(approval.indexOf("--reviewer") + 1));
+    }
+
+    @Test
+    void redactsReviewNotesFromDisplayedCommand() {
+        var command = HistopiaCommand.approveSemantic(
+                "python",
+                Path.of("semantic run"),
+                "Reviewer Name",
+                "private review notes");
+
+        var displayed = HistopiaCommand.display(command);
+
+        assertTrue(displayed.contains("\"Reviewer Name\""));
+        assertTrue(displayed.contains("--review-notes <redacted>"));
+        assertFalse(displayed.contains("private review notes"));
+        assertTrue(displayed.contains("semantic run"));
     }
 }

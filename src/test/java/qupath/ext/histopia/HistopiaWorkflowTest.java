@@ -181,6 +181,16 @@ class HistopiaWorkflowTest {
     }
 
     @Test
+    void boundsAutomaticRegistrationWorkers() {
+        assertEquals(1, HistopiaWorkflow.defaultRegistrationWorkers(1));
+        assertEquals(1, HistopiaWorkflow.defaultRegistrationWorkers(2));
+        assertEquals(2, HistopiaWorkflow.defaultRegistrationWorkers(4));
+        assertEquals(4, HistopiaWorkflow.defaultRegistrationWorkers(8));
+        assertEquals(4, HistopiaWorkflow.defaultRegistrationWorkers(32));
+        assertEquals(4, HistopiaWorkflow.defaultRegistrationWorkers(Integer.MAX_VALUE));
+    }
+
+    @Test
     void choosesInitialReferenceWithoutComparingImmutableListToNull() {
         var first = new HistopiaWorkflow.ProjectSlide(
                 "first", "First", tempDir.resolve("first.ndpi"));

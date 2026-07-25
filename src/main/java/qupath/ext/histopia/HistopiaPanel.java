@@ -43,7 +43,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 final class HistopiaPanel {
 
@@ -60,7 +59,8 @@ final class HistopiaPanel {
     private final TextField modelCache = new TextField();
     private final TextField processedDimension = new TextField("1200");
     private final TextField registrationWorkers = new TextField(
-            Integer.toString(Math.max(1, Runtime.getRuntime().availableProcessors() / 2)));
+            Integer.toString(HistopiaWorkflow.defaultRegistrationWorkers(
+                    Runtime.getRuntime().availableProcessors())));
     private final TextField clusterMin = new TextField("5");
     private final TextField clusterMax = new TextField("15");
     private final TextField semanticBatchSize = new TextField("64");
@@ -676,7 +676,7 @@ final class HistopiaPanel {
         cancellationRequested = false;
         status.setText(name + " running...");
         log.clear();
-        appendLog("$ " + command.stream().collect(Collectors.joining(" ")));
+        appendLog("$ " + HistopiaCommand.display(command));
         CompletableFuture
                 .supplyAsync(() -> run(command), executor)
                 .whenComplete((ignored, error) -> Platform.runLater(() -> {
@@ -710,7 +710,7 @@ final class HistopiaPanel {
                     .start();
             activeProcess = process;
             if (cancellationRequested)
-                process.destroy();
+                HistopiaProcess.cancelTree(process);
             String lastLine = "";
             try (var reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream()))) {
@@ -767,8 +767,7 @@ final class HistopiaPanel {
             return;
         }
         status.setText("Cancelling...");
-        process.descendants().forEach(ProcessHandle::destroy);
-        process.destroy();
+        HistopiaProcess.cancelTree(process);
     }
 
     private void importGeoJson() {

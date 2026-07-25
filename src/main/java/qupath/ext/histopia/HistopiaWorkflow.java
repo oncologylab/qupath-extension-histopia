@@ -32,6 +32,7 @@ final class HistopiaWorkflow {
             "section_order_review.json");
     private static final Set<String> APPROVED_MASK_STATUSES =
             Set.of("auto_pass", "override_pass");
+    private static final int MAX_AUTOMATIC_REGISTRATION_WORKERS = 4;
 
     private HistopiaWorkflow() {
     }
@@ -107,6 +108,14 @@ final class HistopiaWorkflow {
             return normalized;
         throw new IllegalArgumentException(
                 "Semantic device must be auto, cpu, cuda, cuda:N, or mps");
+    }
+
+    static int defaultRegistrationWorkers(int availableProcessors) {
+        return Math.max(
+                1,
+                Math.min(
+                        MAX_AUTOMATIC_REGISTRATION_WORKERS,
+                        availableProcessors / 2));
     }
 
     static WorkflowFiles writeConfigs(

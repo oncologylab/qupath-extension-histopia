@@ -3,8 +3,11 @@ package qupath.ext.histopia;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 final class HistopiaCommand {
+
+    private static final Set<String> REDACTED_OPTIONS = Set.of("--review-notes");
 
     private HistopiaCommand() {
     }
@@ -66,6 +69,21 @@ final class HistopiaCommand {
                 python,
                 "histopia.semantic._cli",
                 List.of("doctor", "--device", HistopiaWorkflow.normalizeDevice(device)));
+    }
+
+    static String display(List<String> command) {
+        var displayed = new ArrayList<String>(command.size());
+        var redactNext = false;
+        for (var argument : command) {
+            if (redactNext) {
+                displayed.add("<redacted>");
+                redactNext = false;
+            } else {
+                displayed.add(quoteForDisplay(argument));
+                redactNext = REDACTED_OPTIONS.contains(argument);
+            }
+        }
+        return String.join(" ", displayed);
     }
 
     static List<String> buildRegistrationReview(
@@ -188,5 +206,11 @@ final class HistopiaCommand {
         var command = new ArrayList<>(List.of(python, "-m", module));
         command.addAll(arguments);
         return List.copyOf(command);
+    }
+
+    private static String quoteForDisplay(String argument) {
+        if (argument.matches("[A-Za-z0-9_./:=+,-]+"))
+            return argument;
+        return "\"" + argument.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }
