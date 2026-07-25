@@ -58,7 +58,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.13.jar` from the
+Download `qupath-extension-histopia-0.3.14.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -66,7 +66,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.13.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.14.jar.sha256
 ```
 
 ## Build From Source
@@ -88,6 +88,12 @@ the atlas, and choose **Approve semantic** before export. Runtime configs, the
 exact project-selection manifest, and local review portals are kept in
 `<workspace>/.histopia`. The semantic viewer is served only on an ephemeral
 `127.0.0.1` port so browser modules and local assets load correctly.
+Reopening the tools refreshes a newly opened project while retaining the
+selected cohort and reference for the same project. Unavailable project
+entries are reported and skipped without hiding usable slides. Workflow inputs
+are locked while a process is active. Starting semantic analysis verifies the
+existing registration selection and seal before atomically updating only the
+semantic runtime config, so reviewed registration provenance is not rewritten.
 
 Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
 control. **Check environment** runs the versioned `histopia-qupath` doctor in

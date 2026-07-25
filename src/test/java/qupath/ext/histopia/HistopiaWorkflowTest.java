@@ -13,6 +13,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -92,6 +93,112 @@ class HistopiaWorkflowTest {
                 files.selectionManifest(), List.of(first, second)));
         assertFalse(HistopiaWorkflow.selectionManifestMatches(
                 files.selectionManifest(), List.of(first)));
+    }
+
+    @Test
+    void semanticRefreshPreservesRegistrationProvenanceFiles() throws Exception {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.scn"));
+        var workspace = tempDir.resolve("analysis");
+        var files = HistopiaWorkflow.writeConfigs(
+                workspace,
+                List.of(one, two),
+                one,
+                "anchored_similarity",
+                1200,
+                2,
+                1,
+                tempDir.resolve("models-a"),
+                "cpu",
+                5,
+                10,
+                32,
+                1,
+                null,
+                2);
+        var registrationBefore = Files.readAllBytes(files.registrationConfig());
+        var selectionBefore = Files.readAllBytes(files.selectionManifest());
+        var registrationModifiedBefore =
+                Files.getLastModifiedTime(files.registrationConfig());
+        var selectionModifiedBefore =
+                Files.getLastModifiedTime(files.selectionManifest());
+
+        var refreshed = HistopiaWorkflow.writeSemanticConfig(
+                workspace,
+                tempDir.resolve("models-b"),
+                "cuda:1",
+                6,
+                12,
+                64,
+                2,
+                4,
+                6);
+
+        assertEquals(files, refreshed);
+        assertTrue(java.util.Arrays.equals(
+                registrationBefore, Files.readAllBytes(files.registrationConfig())));
+        assertTrue(java.util.Arrays.equals(
+                selectionBefore, Files.readAllBytes(files.selectionManifest())));
+        assertEquals(
+                registrationModifiedBefore,
+                Files.getLastModifiedTime(files.registrationConfig()));
+        assertEquals(
+                selectionModifiedBefore,
+                Files.getLastModifiedTime(files.selectionManifest()));
+        var semantic = JsonParser.parseString(
+                Files.readString(files.semanticConfig())).getAsJsonObject();
+        assertEquals("cuda:1", semantic.get("device").getAsString());
+        assertEquals(6, semantic.get("cluster_min").getAsInt());
+        assertEquals(4, semantic.get("vips_threads").getAsInt());
+    }
+
+    @Test
+    void recognizesSupportedLocalUrisWithoutThrowingOnMalformedSources() {
+        var slide = tempDir.resolve("encoded slide.ome.tiff").toAbsolutePath();
+
+        assertEquals(slide, HistopiaWorkflow.localWsiPath(slide.toUri()));
+        assertEquals(
+                null,
+                HistopiaWorkflow.localWsiPath(
+                        URI.create("https://example.org/slide.ndpi")));
+        assertEquals(
+                null,
+                HistopiaWorkflow.localWsiPath(
+                        URI.create("file://remote-host/slide.ndpi")));
+        assertEquals(
+                null,
+                HistopiaWorkflow.localWsiPath(
+                        tempDir.resolve("notes.txt").toUri()));
+    }
+
+    @Test
+    void rejectsUnknownSectionOrderStrategy() {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.scn"));
+
+        var error = assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.writeConfigs(
+                        tempDir.resolve("analysis"),
+                        List.of(one, two),
+                        null,
+                        "manual",
+                        1200,
+                        1,
+                        1,
+                        null,
+                        "auto",
+                        5,
+                        10,
+                        32,
+                        1,
+                        null,
+                        4));
+        assertTrue(error.getMessage().startsWith("Section order must be"));
     }
 
     @Test

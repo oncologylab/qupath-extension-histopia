@@ -31,7 +31,9 @@ import qupath.fx.dialogs.Dialogs;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.io.PathIO;
+import qupath.lib.projects.Project;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -50,6 +52,8 @@ final class HistopiaPanel {
     private static final int REVIEW_WORKERS = 4;
     private final QuPathGUI qupath;
     private final Stage stage = new Stage();
+    private TabPane tabs;
+    private Project<BufferedImage> loadedProject;
     private final TextField python = new TextField("python");
     private final ListView<HistopiaWorkflow.ProjectSlide> projectSlides = new ListView<>();
     private final ComboBox<HistopiaWorkflow.ProjectSlide> projectReference = new ComboBox<>();
@@ -166,6 +170,7 @@ final class HistopiaPanel {
     }
 
     void show() {
+        refreshProjectSlides();
         stage.show();
         stage.toFront();
     }
@@ -178,7 +183,7 @@ final class HistopiaPanel {
         HBox.setHgrow(python, Priority.ALWAYS);
         root.setTop(pythonRow);
 
-        var tabs = new TabPane(
+        tabs = new TabPane(
                 fixedTab("Project workflow", createProjectWorkflowPane()),
                 fixedTab("Run analysis", createAnalysisPane()),
                 fixedTab("Export and import", createExportPane()));
@@ -372,10 +377,27 @@ final class HistopiaPanel {
     }
 
     private void refreshProjectSlides() {
-        var selection = HistopiaWorkflow.discover(qupath.getProject());
+        var project = qupath.getProject();
+        var preserveSelection = project != null && project == loadedProject;
+        var selectedPaths = projectSlides.getSelectionModel().getSelectedItems().stream()
+                .map(HistopiaWorkflow.ProjectSlide::path)
+                .collect(java.util.stream.Collectors.toSet());
+        var previousReference = projectReference.getValue();
+        var selection = HistopiaWorkflow.discover(project);
         projectSlides.getItems().setAll(selection.slides());
-        projectSlides.getSelectionModel().selectAll();
+        if (preserveSelection) {
+            for (var slide : selection.slides()) {
+                if (selectedPaths.contains(slide.path()))
+                    projectSlides.getSelectionModel().select(slide);
+            }
+        } else {
+            projectSlides.getSelectionModel().selectAll();
+        }
+        loadedProject = project;
         refreshReferenceChoices();
+        if (previousReference != null
+                && projectReference.getItems().contains(previousReference))
+            projectReference.setValue(previousReference);
         var message = selection.slides().size() + " local WSI project images available";
         if (!selection.warnings().isEmpty())
             message += "; " + selection.warnings().size() + " unsupported entries skipped";
@@ -393,7 +415,7 @@ final class HistopiaPanel {
 
     private void startProjectRegistration() {
         try {
-            var files = prepareProjectWorkflow();
+            var files = prepareProjectRegistrationWorkflow();
             startCheckedJob(
                     "Registration",
                     "registration",
@@ -408,18 +430,36 @@ final class HistopiaPanel {
 
     private void startProjectSemantic() {
         try {
-            requiredPath(modelCache, "UNI2-h model cache");
-            var files = prepareProjectWorkflow();
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var selected = List.copyOf(
+                    projectSlides.getSelectionModel().getSelectedItems());
+            var files = HistopiaWorkflow.workflowFiles(workspacePath);
+            if (!HistopiaWorkflow.selectionManifestMatches(
+                    files.selectionManifest(), selected))
+                throw new IllegalArgumentException(
+                        "Selected project slides do not match the prepared registration; "
+                                + "select the original cohort or rerun registration");
             if (!HistopiaWorkflow.registrationSealValid(files.registrationRun()))
                 throw new IllegalArgumentException(
                         "Registration seal is missing or stale; review and seal "
                                 + "the exact current result before semantic analysis");
             if (!HistopiaWorkflow.registrationMatchesSelection(
-                    files.registrationRun(),
-                    List.copyOf(projectSlides.getSelectionModel().getSelectedItems())))
+                    files.registrationRun(), selected))
                 throw new IllegalArgumentException(
                         "Selected project slides do not match the sealed registration; "
                                 + "rerun registration for this selection before semantic analysis");
+            files = HistopiaWorkflow.writeSemanticConfig(
+                    workspacePath,
+                    requiredPath(modelCache, "UNI2-h model cache"),
+                    selectedSemanticDevice(),
+                    positiveInteger(clusterMin, "K min"),
+                    positiveInteger(clusterMax, "K max"),
+                    positiveInteger(semanticBatchSize, "Semantic batch size"),
+                    positiveInteger(patchWorkers, "Patch workers"),
+                    optionalPositiveInteger(vipsThreads, "VIPS threads"),
+                    positiveInteger(fitThreads, "Semantic fit threads"));
+            semanticConfig.setText(files.semanticConfig().toString());
+            semantic.setText(files.semanticRun().toString());
             startCheckedJob(
                     "Semantic atlas",
                     "semantic",
@@ -585,7 +625,8 @@ final class HistopiaPanel {
         List<String> build(String python, Path run, String reviewer, String notes);
     }
 
-    private HistopiaWorkflow.WorkflowFiles prepareProjectWorkflow() throws IOException {
+    private HistopiaWorkflow.WorkflowFiles prepareProjectRegistrationWorkflow()
+            throws IOException {
         var selected = List.copyOf(
                 projectSlides.getSelectionModel().getSelectedItems());
         var files = HistopiaWorkflow.writeConfigs(
@@ -797,6 +838,8 @@ final class HistopiaPanel {
     }
 
     private void setJobRunning(boolean running) {
+        tabs.setDisable(running);
+        python.setDisable(running);
         runRegistration.setDisable(running);
         runSemantic.setDisable(running);
         runProjectRegistration.setDisable(running);

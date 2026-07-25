@@ -11,8 +11,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -26,6 +28,8 @@ final class HistopiaWorkflow {
 
     private static final Set<String> WSI_EXTENSIONS =
             Set.of(".ndpi", ".scn", ".svs", ".tif", ".tiff");
+    private static final Set<String> SECTION_ORDER_STRATEGIES =
+            Set.of("anchored_similarity", "similarity", "natural");
     private static final Set<String> REGISTRATION_SEAL_ARTIFACTS = Set.of(
             "registration_result.json",
             "mask_review.json",
@@ -75,18 +79,28 @@ final class HistopiaWorkflow {
         var slides = new ArrayList<ProjectSlide>();
         var warnings = new ArrayList<String>();
         for (var entry : project.getImageList()) {
-            var uris = entry.getServerBuilder().getURIs();
-            if (uris.size() != 1) {
-                warnings.add(entry.getImageName() + ": expected one source URI");
-                continue;
+            try {
+                var builder = entry.getServerBuilder();
+                var uris = builder == null ? null : builder.getURIs();
+                if (uris == null || uris.size() != 1) {
+                    warnings.add(entry.getImageName() + ": expected one source URI");
+                    continue;
+                }
+                var uri = uris.iterator().next();
+                var path = localWsiPath(uri);
+                if (path == null) {
+                    warnings.add(
+                            entry.getImageName() + ": source is not a supported local WSI");
+                    continue;
+                }
+                if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+                    warnings.add(entry.getImageName() + ": local WSI is unavailable");
+                    continue;
+                }
+                slides.add(new ProjectSlide(entry.getID(), entry.getImageName(), path));
+            } catch (RuntimeException error) {
+                warnings.add(entry.getImageName() + ": source URI could not be read");
             }
-            var uri = uris.iterator().next();
-            var path = localWsiPath(uri);
-            if (path == null) {
-                warnings.add(entry.getImageName() + ": source is not a supported local WSI");
-                continue;
-            }
-            slides.add(new ProjectSlide(entry.getID(), entry.getImageName(), path));
         }
         return new ProjectSelection(slides, warnings);
     }
@@ -118,6 +132,17 @@ final class HistopiaWorkflow {
                         availableProcessors / 2));
     }
 
+    static WorkflowFiles workflowFiles(Path workspace) {
+        workspace = workspace.toAbsolutePath().normalize();
+        var metadataDir = workspace.resolve(".histopia");
+        return new WorkflowFiles(
+                metadataDir.resolve("registration-config.json"),
+                metadataDir.resolve("semantic-config.json"),
+                metadataDir.resolve("qupath-selection.json"),
+                workspace.resolve("registration"),
+                workspace.resolve("semantic"));
+    }
+
     static WorkflowFiles writeConfigs(
             Path workspace,
             List<ProjectSlide> slides,
@@ -141,13 +166,7 @@ final class HistopiaWorkflow {
         requirePositive(maxProcessedDimension, "Processed image dimension");
         requirePositive(workers, "Registration workers");
         requirePositive(qcWorkers, "QC workers");
-        requirePositive(batchSize, "Semantic batch size");
-        requirePositive(patchWorkers, "Patch workers");
-        if (vipsThreads != null)
-            requirePositive(vipsThreads, "VIPS threads");
-        requirePositive(fitThreads, "Semantic fit threads");
-        if (clusterMin <= 1 || clusterMax < clusterMin)
-            throw new IllegalArgumentException("Semantic K range is invalid");
+        requireOrderStrategy(orderStrategy);
         var duplicate = slides.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
                         ProjectSlide::filename,
@@ -160,16 +179,13 @@ final class HistopiaWorkflow {
             throw new IllegalArgumentException(
                     "Selected slide filenames must be unique: " + duplicate.get());
 
-        workspace = workspace.toAbsolutePath().normalize();
-        var metadataDir = workspace.resolve(".histopia");
-        var registrationRun = workspace.resolve("registration");
-        var semanticRun = workspace.resolve("semantic");
+        var files = workflowFiles(workspace);
+        var metadataDir = files.registrationConfig().getParent();
         Files.createDirectories(metadataDir);
-        var selectionPath = metadataDir.resolve("qupath-selection.json");
 
         var registration = new JsonObject();
         registration.addProperty("input_dir", slides.get(0).path().getParent().toString());
-        registration.addProperty("output_dir", registrationRun.toString());
+        registration.addProperty("output_dir", files.registrationRun().toString());
         var inputs = new JsonArray();
         slides.forEach(slide -> inputs.add(slide.path().toString()));
         registration.add("input_slides", inputs);
@@ -179,7 +195,8 @@ final class HistopiaWorkflow {
             registration.addProperty("reference_slide", reference.filename());
         registration.addProperty("section_order_strategy", orderStrategy);
         if (reference != null && "anchored_similarity".equals(orderStrategy))
-            registration.addProperty("section_order_path", selectionPath.toString());
+            registration.addProperty(
+                    "section_order_path", files.selectionManifest().toString());
         registration.addProperty("thumbnail_workers", workers);
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
@@ -194,20 +211,16 @@ final class HistopiaWorkflow {
         registration.addProperty("max_processed_image_dim_px", maxProcessedDimension);
         registration.addProperty("write_processed_images", true);
 
-        var semantic = new JsonObject();
-        semantic.addProperty("registration_run", registrationRun.toString());
-        semantic.addProperty("output_dir", semanticRun.toString());
-        if (modelCache != null)
-            semantic.addProperty(
-                    "model_cache_dir", modelCache.toAbsolutePath().normalize().toString());
-        semantic.addProperty("device", normalizeDevice(device));
-        semantic.addProperty("cluster_min", clusterMin);
-        semantic.addProperty("cluster_max", clusterMax);
-        semantic.addProperty("batch_size", batchSize);
-        semantic.addProperty("patch_workers", patchWorkers);
-        if (vipsThreads != null)
-            semantic.addProperty("vips_threads", vipsThreads);
-        semantic.addProperty("fit_threads", fitThreads);
+        var semantic = semanticConfig(
+                files,
+                modelCache,
+                device,
+                clusterMin,
+                clusterMax,
+                batchSize,
+                patchWorkers,
+                vipsThreads,
+                fitThreads);
 
         var selection = new JsonObject();
         selection.addProperty("format", "histopia-qupath-selection");
@@ -232,26 +245,45 @@ final class HistopiaWorkflow {
         selection.add("slides", selectedSlides);
 
         var gson = new GsonBuilder().setPrettyPrinting().create();
-        var registrationPath = metadataDir.resolve("registration-config.json");
-        var semanticPath = metadataDir.resolve("semantic-config.json");
-        Files.writeString(
-                registrationPath,
-                gson.toJson(registration) + System.lineSeparator(),
-                StandardCharsets.UTF_8);
-        Files.writeString(
-                semanticPath,
-                gson.toJson(semantic) + System.lineSeparator(),
-                StandardCharsets.UTF_8);
-        Files.writeString(
-                selectionPath,
-                gson.toJson(selection) + System.lineSeparator(),
-                StandardCharsets.UTF_8);
-        return new WorkflowFiles(
-                registrationPath,
-                semanticPath,
-                selectionPath,
-                registrationRun,
-                semanticRun);
+        writeStringAtomic(
+                files.selectionManifest(),
+                gson.toJson(selection) + System.lineSeparator());
+        writeStringAtomic(
+                files.semanticConfig(),
+                gson.toJson(semantic) + System.lineSeparator());
+        writeStringAtomic(
+                files.registrationConfig(),
+                gson.toJson(registration) + System.lineSeparator());
+        return files;
+    }
+
+    static WorkflowFiles writeSemanticConfig(
+            Path workspace,
+            Path modelCache,
+            String device,
+            int clusterMin,
+            int clusterMax,
+            int batchSize,
+            int patchWorkers,
+            Integer vipsThreads,
+            int fitThreads) throws IOException {
+        var files = workflowFiles(workspace);
+        Files.createDirectories(files.semanticConfig().getParent());
+        var semantic = semanticConfig(
+                files,
+                modelCache,
+                device,
+                clusterMin,
+                clusterMax,
+                batchSize,
+                patchWorkers,
+                vipsThreads,
+                fitThreads);
+        var gson = new GsonBuilder().setPrettyPrinting().create();
+        writeStringAtomic(
+                files.semanticConfig(),
+                gson.toJson(semantic) + System.lineSeparator());
+        return files;
     }
 
     static String registrationStatus(Path registrationRun) {
@@ -451,14 +483,92 @@ final class HistopiaWorkflow {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static Path localWsiPath(URI uri) {
-        if (!"file".equalsIgnoreCase(uri.getScheme()))
+    static Path localWsiPath(URI uri) {
+        if (uri == null || !"file".equalsIgnoreCase(uri.getScheme()))
             return null;
-        var path = Path.of(uri).toAbsolutePath().normalize();
-        var name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (WSI_EXTENSIONS.stream().noneMatch(name::endsWith))
+        try {
+            var path = Path.of(uri).toAbsolutePath().normalize();
+            var filename = path.getFileName();
+            if (filename == null)
+                return null;
+            var name = filename.toString().toLowerCase(Locale.ROOT);
+            if (WSI_EXTENSIONS.stream().noneMatch(name::endsWith))
+                return null;
+            return path;
+        } catch (RuntimeException error) {
             return null;
-        return path;
+        }
+    }
+
+    private static JsonObject semanticConfig(
+            WorkflowFiles files,
+            Path modelCache,
+            String device,
+            int clusterMin,
+            int clusterMax,
+            int batchSize,
+            int patchWorkers,
+            Integer vipsThreads,
+            int fitThreads) {
+        requirePositive(batchSize, "Semantic batch size");
+        requirePositive(patchWorkers, "Patch workers");
+        if (vipsThreads != null)
+            requirePositive(vipsThreads, "VIPS threads");
+        requirePositive(fitThreads, "Semantic fit threads");
+        if (clusterMin <= 1 || clusterMax < clusterMin)
+            throw new IllegalArgumentException("Semantic K range is invalid");
+
+        var semantic = new JsonObject();
+        semantic.addProperty("registration_run", files.registrationRun().toString());
+        semantic.addProperty("output_dir", files.semanticRun().toString());
+        if (modelCache != null)
+            semantic.addProperty(
+                    "model_cache_dir", modelCache.toAbsolutePath().normalize().toString());
+        semantic.addProperty("device", normalizeDevice(device));
+        semantic.addProperty("cluster_min", clusterMin);
+        semantic.addProperty("cluster_max", clusterMax);
+        semantic.addProperty("batch_size", batchSize);
+        semantic.addProperty("patch_workers", patchWorkers);
+        if (vipsThreads != null)
+            semantic.addProperty("vips_threads", vipsThreads);
+        semantic.addProperty("fit_threads", fitThreads);
+        return semantic;
+    }
+
+    private static void writeStringAtomic(Path path, String text) throws IOException {
+        if (Files.isRegularFile(path)
+                && Files.readString(path, StandardCharsets.UTF_8).equals(text))
+            return;
+        var temporary = Files.createTempFile(
+                path.getParent(),
+                "." + path.getFileName() + ".",
+                ".tmp");
+        var moved = false;
+        try {
+            Files.writeString(temporary, text, StandardCharsets.UTF_8);
+            try {
+                Files.move(
+                        temporary,
+                        path,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException error) {
+                Files.move(
+                        temporary,
+                        path,
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+            moved = true;
+        } finally {
+            if (!moved)
+                Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static void requireOrderStrategy(String value) {
+        if (!SECTION_ORDER_STRATEGIES.contains(value))
+            throw new IllegalArgumentException(
+                    "Section order must be anchored_similarity, similarity, or natural");
     }
 
     private static void requirePositive(int value, String label) {
