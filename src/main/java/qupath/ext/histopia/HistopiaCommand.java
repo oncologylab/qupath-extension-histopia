@@ -7,7 +7,10 @@ import java.util.Set;
 
 final class HistopiaCommand {
 
+    private static final int QUPATH_WORKFLOW_API_VERSION = 1;
     private static final Set<String> REDACTED_OPTIONS = Set.of("--review-notes");
+    private static final Set<String> WORKFLOWS =
+            Set.of("registration", "semantic", "interchange", "full");
 
     private HistopiaCommand() {
     }
@@ -64,11 +67,28 @@ final class HistopiaCommand {
         return moduleCommand(python, "histopia.semantic._cli", arguments);
     }
 
-    static List<String> inspectCompute(String python, String device) {
+    static List<String> inspectEnvironment(
+            String python,
+            String device,
+            String workflow) {
+        var normalizedWorkflow = workflow == null ? "" : workflow.strip().toLowerCase();
+        if (!WORKFLOWS.contains(normalizedWorkflow))
+            throw new IllegalArgumentException(
+                    "Workflow must be registration, semantic, interchange, or full");
+        var normalizedDevice = Set.of("semantic", "full").contains(normalizedWorkflow)
+                ? HistopiaWorkflow.normalizeDevice(device)
+                : "auto";
         return moduleCommand(
                 python,
-                "histopia.semantic._cli",
-                List.of("doctor", "--device", HistopiaWorkflow.normalizeDevice(device)));
+                "histopia.qupath._cli",
+                List.of(
+                        "--doctor",
+                        "--workflow",
+                        normalizedWorkflow,
+                        "--device",
+                        normalizedDevice,
+                        "--require-api",
+                        Integer.toString(QUPATH_WORKFLOW_API_VERSION)));
     }
 
     static String display(List<String> command) {

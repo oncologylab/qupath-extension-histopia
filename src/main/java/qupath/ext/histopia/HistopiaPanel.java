@@ -88,7 +88,7 @@ final class HistopiaPanel {
     private final ComboBox<Integer> clusters = new ComboBox<>();
     private final Button runRegistration = new Button("Run registration");
     private final Button runSemantic = new Button("Run semantic atlas");
-    private final Button checkCompute = new Button("Check compute");
+    private final Button checkEnvironment = new Button("Check environment");
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
     private final Button openProjectReview = new Button("Open registration QC");
@@ -108,6 +108,7 @@ final class HistopiaPanel {
     });
     private volatile Process activeProcess;
     private volatile boolean cancellationRequested;
+    private volatile boolean jobRunning;
 
     HistopiaPanel(QuPathGUI qupath) {
         this.qupath = qupath;
@@ -227,7 +228,7 @@ final class HistopiaPanel {
         settings.setPrefWrapLength(820);
         runProjectRegistration.setOnAction(event -> startProjectRegistration());
         runProjectSemantic.setOnAction(event -> startProjectSemantic());
-        checkCompute.setOnAction(event -> inspectCompute());
+        checkEnvironment.setOnAction(event -> inspectEnvironment());
         approveProjectMasks.setOnAction(event -> approveProjectMasks());
         approveProjectOrder.setOnAction(event -> approveProjectOrder());
         approveProjectRegistration.setOnAction(event -> approveProjectRegistration());
@@ -249,7 +250,7 @@ final class HistopiaPanel {
                 runProjectSemantic,
                 openProjectSemanticReview,
                 approveProjectSemantic,
-                checkCompute,
+                checkEnvironment,
                 projectAllowModelDownload);
         var pane = new VBox(
                 8, selectionHeader, projectSlides, paths, settings, review, actions);
@@ -362,7 +363,7 @@ final class HistopiaPanel {
             var command = HistopiaCommand.runRegistration(
                     python.getText(),
                     requiredFile(registrationConfig, "Registration config"));
-            startJob("Registration", command);
+            startCheckedJob("Registration", "registration", command, null);
         } catch (IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia registration", error.getMessage());
         }
@@ -391,8 +392,9 @@ final class HistopiaPanel {
     private void startProjectRegistration() {
         try {
             var files = prepareProjectWorkflow();
-            startJob(
+            startCheckedJob(
                     "Registration",
+                    "registration",
                     HistopiaCommand.runRegistration(
                             python.getText(), files.registrationConfig()),
                     () -> status.setText(
@@ -416,8 +418,9 @@ final class HistopiaPanel {
                 throw new IllegalArgumentException(
                         "Selected project slides do not match the sealed registration; "
                                 + "rerun registration for this selection before semantic analysis");
-            startJob(
+            startCheckedJob(
                     "Semantic atlas",
+                    "semantic",
                     HistopiaCommand.runSemantic(
                             python.getText(),
                             files.semanticConfig(),
@@ -606,14 +609,14 @@ final class HistopiaPanel {
         return files;
     }
 
-    private void inspectCompute() {
+    private void inspectEnvironment() {
         try {
             startJob(
-                    "Compute check",
-                    HistopiaCommand.inspectCompute(
-                            python.getText(), selectedSemanticDevice()));
+                    "Environment check",
+                    HistopiaCommand.inspectEnvironment(
+                            python.getText(), selectedSemanticDevice(), "full"));
         } catch (IllegalArgumentException error) {
-            Dialogs.showErrorMessage("Histopia compute", error.getMessage());
+            Dialogs.showErrorMessage("Histopia environment", error.getMessage());
         }
     }
 
@@ -631,7 +634,7 @@ final class HistopiaPanel {
                     python.getText(),
                     requiredFile(semanticConfig, "Semantic config"),
                     allowModelDownload.isSelected());
-            startJob("Semantic atlas", command);
+            startCheckedJob("Semantic atlas", "semantic", command, null);
         } catch (IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia semantic atlas", error.getMessage());
         }
@@ -652,7 +655,7 @@ final class HistopiaPanel {
                     requiredPath(output, "Output bundle"),
                     semanticPath,
                     selectedClusters);
-            startJob("QuPath export", command);
+            startCheckedJob("QuPath export", "interchange", command, null);
         } catch (IllegalArgumentException error) {
             Dialogs.showErrorMessage("Histopia export", error.getMessage());
         }
@@ -678,23 +681,44 @@ final class HistopiaPanel {
         startJob(name, command, null);
     }
 
+    private void startCheckedJob(
+            String name,
+            String workflow,
+            List<String> command,
+            Runnable onSuccess) {
+        var preflight = HistopiaCommand.inspectEnvironment(
+                python.getText(), selectedSemanticDevice(), workflow);
+        startJobs(name, List.of(preflight, command), onSuccess);
+    }
+
     private void startJob(
             String name,
             List<String> command,
             Runnable onSuccess) {
-        if (activeProcess != null) {
+        startJobs(name, List.of(command), onSuccess);
+    }
+
+    private void startJobs(
+            String name,
+            List<List<String>> commands,
+            Runnable onSuccess) {
+        if (jobRunning) {
             Dialogs.showErrorMessage(
                     "Histopia", "Another Histopia process is already running.");
             return;
         }
+        if (commands.isEmpty())
+            throw new IllegalArgumentException("Histopia job must contain a command");
+        var immutableCommands = commands.stream().map(List::copyOf).toList();
+        jobRunning = true;
         setJobRunning(true);
         cancellationRequested = false;
         status.setText(name + " running...");
         log.clear();
-        appendLog("$ " + HistopiaCommand.display(command));
         CompletableFuture
-                .supplyAsync(() -> run(command), executor)
+                .supplyAsync(() -> runAll(immutableCommands), executor)
                 .whenComplete((ignored, error) -> Platform.runLater(() -> {
+                    jobRunning = false;
                     setJobRunning(false);
                     if (error == null) {
                         try {
@@ -718,6 +742,17 @@ final class HistopiaPanel {
                 }));
     }
 
+    private String runAll(List<List<String>> commands) {
+        String result = "";
+        for (var command : commands) {
+            if (cancellationRequested)
+                throw new CancellationException("Histopia job cancelled");
+            appendLog("$ " + HistopiaCommand.display(command));
+            result = run(command);
+        }
+        return result;
+    }
+
     private String run(List<String> command) {
         try {
             var process = new ProcessBuilder(command)
@@ -739,7 +774,9 @@ final class HistopiaPanel {
             if (cancellationRequested)
                 throw new CancellationException("Histopia job cancelled");
             if (exitCode != 0)
-                throw new IllegalStateException("Histopia exited with code " + exitCode);
+                throw new IllegalStateException(
+                        "Histopia exited with code " + exitCode
+                                + (lastLine.isBlank() ? "" : ": " + lastLine));
             return lastLine.isBlank() ? "Histopia job completed" : lastLine;
         } catch (IOException error) {
             throw new IllegalStateException(
@@ -762,7 +799,7 @@ final class HistopiaPanel {
         runSemantic.setDisable(running);
         runProjectRegistration.setDisable(running);
         runProjectSemantic.setDisable(running);
-        checkCompute.setDisable(running);
+        checkEnvironment.setDisable(running);
         openProjectReview.setDisable(running);
         openProjectSemanticReview.setDisable(running);
         approveProjectMasks.setDisable(running);

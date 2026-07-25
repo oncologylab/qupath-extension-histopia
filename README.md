@@ -17,7 +17,10 @@ semantic-atlas results.
   thread limits plus bounded global-fit threads without authoring config files
 - choose conservative automatic registration and QC worker counts capped at
   four, then tune preprocessing and memory-heavier QC rendering independently
-- validate the selected Python and compute device directly from the extension
+- validate the selected Histopia workflow API, Python dependencies, native
+  libvips runtime, and compute device directly from the extension
+- run workflow-specific environment preflight automatically before
+  registration, semantic analysis, and interchange export
 - run registration and global semantic-atlas configs without blocking QuPath
 - stream Python progress, redact review notes from the command log, and cancel
   the complete Python process tree with bounded force escalation
@@ -55,7 +58,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.11.jar` from the
+Download `qupath-extension-histopia-0.3.12.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -63,7 +66,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.11.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.12.jar.sha256
 ```
 
 ## Build From Source
@@ -87,9 +90,11 @@ exact project-selection manifest, and local review portals are kept in
 `127.0.0.1` port so browser modules and local assets load correctly.
 
 Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
-control. **Check compute** runs `histopia-semantic doctor` in the selected
-Python environment and streams the resolved backend and accelerator details to
-the extension log before a long extraction is started. Leave **VIPS threads**
+control. **Check environment** runs the versioned `histopia-qupath` doctor in
+the selected Python environment and streams dependency, libvips, backend, and
+accelerator details to the extension log. Registration, semantic analysis, and
+export run their narrower preflight automatically before starting. Leave
+**VIPS threads**
 blank for libvips' adaptive default, or enter a positive cap shared by
 registration WSI reads and semantic extraction after benchmarking the target
 scanner format, storage, and host. The automatic registration-worker value uses

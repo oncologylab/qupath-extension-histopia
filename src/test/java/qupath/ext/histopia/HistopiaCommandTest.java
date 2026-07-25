@@ -51,15 +51,29 @@ class HistopiaCommandTest {
     }
 
     @Test
-    void buildsComputeInspectionForExplicitGpu() {
-        var command = HistopiaCommand.inspectCompute("python", " CUDA:2 ");
+    void buildsEnvironmentInspectionForExplicitGpu() {
+        var command = HistopiaCommand.inspectEnvironment(
+                "python", " CUDA:2 ", "semantic");
 
-        assertEquals("histopia.semantic._cli", command.get(2));
-        assertEquals("doctor", command.get(3));
+        assertEquals("histopia.qupath._cli", command.get(2));
+        assertEquals("--doctor", command.get(3));
+        assertEquals("semantic", command.get(command.indexOf("--workflow") + 1));
         assertEquals("cuda:2", command.get(command.indexOf("--device") + 1));
+        assertEquals("1", command.get(command.indexOf("--require-api") + 1));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> HistopiaCommand.inspectCompute("python", "gpu"));
+                () -> HistopiaCommand.inspectEnvironment(
+                        "python", "gpu", "semantic"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaCommand.inspectEnvironment(
+                        "python", "cpu", "unknown"));
+
+        var registration = HistopiaCommand.inspectEnvironment(
+                "python", "not-used", "registration");
+        assertEquals(
+                "auto",
+                registration.get(registration.indexOf("--device") + 1));
     }
 
     @Test
