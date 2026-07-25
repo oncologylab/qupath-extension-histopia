@@ -62,6 +62,7 @@ class HistopiaWorkflowTest {
                 registration.get("section_order_path").getAsString());
         assertTrue(registration.get("preprocessing_cache").getAsBoolean());
         assertTrue(registration.get("alignment_cache").getAsBoolean());
+        assertEquals(4, registration.get("qc_workers").getAsInt());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
 
