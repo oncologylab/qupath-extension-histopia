@@ -11,6 +11,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class HistopiaBundleTest {
@@ -250,11 +251,81 @@ class HistopiaBundleTest {
         assertThrows(
                 IOException.class,
                 () -> HistopiaBundle.findSemanticAnnotations(
+                    manifest, Set.of("section.ndpi")));
+    }
+
+    @Test
+    void requiresFinalRegistrationApprovalForSchemaFour() throws IOException {
+        var annotations = directory.resolve("annotations/001-section.geojson");
+        Files.createDirectories(annotations.getParent());
+        Files.writeString(annotations, "{}");
+        var manifest = directory.resolve("histopia-qupath.json");
+        var registrationSha =
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        Files.writeString(
+                manifest,
+                """
+                {
+                  "schema_version": 4,
+                  "format": "histopia-qupath-bundle",
+                  "registration_sha256": "%s",
+                  "registration_approval": {
+                    "approval_sha256":
+                      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "registration_result_sha256": "%s",
+                    "order_fingerprint": "order-fingerprint",
+                    "reviewer": "Reviewer",
+                    "reviewed_at": "2026-07-24T18:00:00+00:00"
+                  },
+                  "semantic_fingerprint": "result-fingerprint",
+                  "semantic_preflight_fingerprint": "preflight-fingerprint",
+                  "semantic_approval": {
+                    "fingerprint": "result-fingerprint",
+                    "reviewer": "Reviewer",
+                    "reviewed_at": "2026-07-24T18:30:00+00:00"
+                  },
+                  "slides": [{
+                    "id": "section.ndpi",
+                    "semantic_annotations": "annotations/001-section.geojson",
+                    "semantic_annotations_sha256":
+                      "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                    "semantic_annotations_bytes": 2
+                  }]
+                }
+                """.formatted(registrationSha, registrationSha));
+
+        assertEquals(
+                annotations,
+                HistopiaBundle.findSemanticAnnotations(
+                        manifest, Set.of("section.ndpi")).path());
+
+        var original = Files.readString(manifest);
+        Files.writeString(
+                manifest,
+                original.replace(
+                        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "not-a-sha256"));
+        assertThrows(
+                IOException.class,
+                () -> HistopiaBundle.findSemanticAnnotations(
+                        manifest, Set.of("section.ndpi")));
+
+        Files.writeString(
+                manifest,
+                original.replace(
+                        "\"registration_result_sha256\": \"%s\""
+                                .formatted(registrationSha),
+                        "\"registration_result_sha256\": "
+                                + "\"cccccccccccccccccccccccccccccccc"
+                                + "cccccccccccccccccccccccccccccccc\""));
+        assertThrows(
+                IOException.class,
+                () -> HistopiaBundle.findSemanticAnnotations(
                         manifest, Set.of("section.ndpi")));
     }
 
     @Test
-    void validatesExternalSchemaThreeBundleWhenConfigured() throws IOException {
+    void validatesExternalCurrentBundleWhenConfigured() throws IOException {
         var configured = System.getenv("HISTOPIA_VALIDATED_QUPATH_BUNDLE");
         assumeTrue(configured != null && !configured.isBlank());
         var manifest = Path.of(configured);
@@ -266,7 +337,7 @@ class HistopiaBundleTest {
         var artifact = HistopiaBundle.findSemanticAnnotations(
                 manifest, Set.of(id));
 
-        assertEquals(3, root.get("schema_version").getAsInt());
+        assertTrue(root.get("schema_version").getAsInt() >= 3);
         assertEquals(
                 first.get("semantic_annotations_bytes").getAsLong(),
                 Files.size(artifact.path()));

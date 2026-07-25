@@ -64,7 +64,7 @@ final class HistopiaBundle {
             var schemaVersion = root.has("schema_version")
                     ? requiredInteger(root, "schema_version")
                     : 1;
-            if (schemaVersion < 1 || schemaVersion > 3)
+            if (schemaVersion < 1 || schemaVersion > 4)
                 throw new IOException("Unsupported Histopia bundle schema");
             if (!root.has("slides") || !root.get("slides").isJsonArray())
                 throw new IOException("Histopia bundle has no slide array");
@@ -77,6 +77,8 @@ final class HistopiaBundle {
                     continue;
                 if (schemaVersion >= 3)
                     validateSemanticApproval(root);
+                if (schemaVersion >= 4)
+                    validateRegistrationApproval(root);
                 var relative = requiredString(slide, "semantic_annotations");
                 var path = manifestParent.resolve(relative).normalize();
                 if (!path.startsWith(manifestParent))
@@ -141,6 +143,29 @@ final class HistopiaBundle {
         if (approval.has("reviewed_at")
                 && !approval.get("reviewed_at").isJsonNull())
             requiredString(approval, "reviewed_at");
+    }
+
+    private static void validateRegistrationApproval(JsonObject root) throws IOException {
+        var registrationSha256 = requiredSha256(root, "registration_sha256");
+        if (!root.has("registration_approval")
+                || !root.get("registration_approval").isJsonObject())
+            throw new IOException("Schema-4 bundle has no registration approval");
+        var approval = root.getAsJsonObject("registration_approval");
+        requiredSha256(approval, "approval_sha256");
+        if (!registrationSha256.equals(
+                requiredSha256(approval, "registration_result_sha256")))
+            throw new IOException("Schema-4 registration approval fingerprint is stale");
+        requiredString(approval, "order_fingerprint");
+        requiredString(approval, "reviewer");
+        requiredString(approval, "reviewed_at");
+    }
+
+    private static String requiredSha256(JsonObject object, String name)
+            throws IOException {
+        var value = requiredString(object, name);
+        if (!value.matches("[0-9a-fA-F]{64}"))
+            throw new IOException("Histopia bundle contains an invalid " + name);
+        return value.toLowerCase();
     }
 
     private static String requiredString(JsonObject object, String name)
