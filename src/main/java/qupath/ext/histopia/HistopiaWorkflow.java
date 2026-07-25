@@ -182,6 +182,7 @@ final class HistopiaWorkflow {
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
         registration.addProperty("preprocessing_cache", true);
+        registration.addProperty("alignment_cache", true);
         registration.addProperty("require_approved_masks", true);
         registration.addProperty("require_approved_order", true);
         registration.addProperty("wsi_only", true);
