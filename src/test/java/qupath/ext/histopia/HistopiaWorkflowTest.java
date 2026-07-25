@@ -67,6 +67,7 @@ class HistopiaWorkflowTest {
         assertEquals(4, registration.get("mask_workers").getAsInt());
         assertEquals(4, registration.get("ordering_workers").getAsInt());
         assertEquals(2, registration.get("qc_workers").getAsInt());
+        assertEquals(4, registration.get("vips_threads").getAsInt());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
 
@@ -199,8 +200,11 @@ class HistopiaWorkflowTest {
                 null,
                 4);
 
+        var registration = JsonParser.parseString(
+                Files.readString(files.registrationConfig())).getAsJsonObject();
         var semantic = JsonParser.parseString(Files.readString(files.semanticConfig()))
                 .getAsJsonObject();
+        assertFalse(registration.has("vips_threads"));
         assertFalse(semantic.has("vips_threads"));
         assertEquals(4, semantic.get("fit_threads").getAsInt());
     }

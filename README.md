@@ -47,7 +47,15 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.3.10.jar` from the
+Install the current Python workflow in the environment that the extension will
+use:
+
+```bash
+python -m pip install \
+  "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
+```
+
+Download `qupath-extension-histopia-0.3.11.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -55,7 +63,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.10.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.11.jar.sha256
 ```
 
 ## Build From Source
@@ -82,10 +90,15 @@ Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
 control. **Check compute** runs `histopia-semantic doctor` in the selected
 Python environment and streams the resolved backend and accelerator details to
 the extension log before a long extraction is started. Leave **VIPS threads**
-blank for libvips' adaptive default, or enter a positive cap after benchmarking
-the target WSI storage and host. The automatic registration-worker value uses
+blank for libvips' adaptive default, or enter a positive cap shared by
+registration WSI reads and semantic extraction after benchmarking the target
+scanner format, storage, and host. The automatic registration-worker value uses
 half the available processors up to a maximum of four; it remains editable for
 measured host-specific tuning of thumbnail, mask, and section-order work.
+On one validated 17,280 x 17,664 SCN export, eight native threads completed in
+5.17 seconds at 598 MiB peak RSS, while sixteen took 5.25 seconds at 839 MiB;
+the generated TIFFs were byte-identical. This is measured guidance, not a
+portable default.
 **QC workers** independently bounds concurrent registration diagnostics so an
 eight-worker mask setting does not force eight memory-heavier QC renderers. In
 a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak

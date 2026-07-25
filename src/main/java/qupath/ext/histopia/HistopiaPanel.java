@@ -127,7 +127,8 @@ final class HistopiaPanel {
         semanticDevice.setValue("auto");
         vipsThreads.setPromptText("adaptive");
         vipsThreads.setTooltip(new Tooltip(
-                "Optional native libvips worker cap; leave blank for adaptive"));
+                "Optional native libvips worker cap for registration and semantic "
+                        + "WSI reads; leave blank for adaptive"));
         fitThreads.setTooltip(new Tooltip(
                 "Native BLAS/OpenMP threads used for global atlas fitting"));
         registrationWorkers.setTooltip(new Tooltip(
