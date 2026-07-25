@@ -39,6 +39,7 @@ class HistopiaWorkflowTest {
                 "anchored_similarity",
                 1200,
                 4,
+                2,
                 tempDir.resolve("models"),
                 " CUDA:1 ",
                 5,
@@ -62,7 +63,10 @@ class HistopiaWorkflowTest {
                 registration.get("section_order_path").getAsString());
         assertTrue(registration.get("preprocessing_cache").getAsBoolean());
         assertTrue(registration.get("alignment_cache").getAsBoolean());
-        assertEquals(4, registration.get("qc_workers").getAsInt());
+        assertEquals(4, registration.get("thumbnail_workers").getAsInt());
+        assertEquals(4, registration.get("mask_workers").getAsInt());
+        assertEquals(4, registration.get("ordering_workers").getAsInt());
+        assertEquals(2, registration.get("qc_workers").getAsInt());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
 
@@ -105,6 +109,7 @@ class HistopiaWorkflowTest {
                         "natural",
                         1200,
                         1,
+                        1,
                         null,
                         "auto",
                         5,
@@ -131,6 +136,7 @@ class HistopiaWorkflowTest {
                         "natural",
                         1200,
                         1,
+                        1,
                         null,
                         "auto",
                         5,
@@ -139,6 +145,34 @@ class HistopiaWorkflowTest {
                         1,
                         0,
                         4));
+    }
+
+    @Test
+    void rejectsNonpositiveQcWorkers() {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.ndpi"));
+
+        var error = assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.writeConfigs(
+                        tempDir.resolve("analysis"),
+                        List.of(one, two),
+                        null,
+                        "natural",
+                        1200,
+                        4,
+                        0,
+                        null,
+                        "auto",
+                        5,
+                        10,
+                        32,
+                        1,
+                        null,
+                        4));
+        assertEquals("QC workers must be positive", error.getMessage());
     }
 
     @Test
@@ -154,6 +188,7 @@ class HistopiaWorkflowTest {
                 null,
                 "natural",
                 1200,
+                1,
                 1,
                 null,
                 "auto",
@@ -185,6 +220,7 @@ class HistopiaWorkflowTest {
                         null,
                         "natural",
                         1200,
+                        1,
                         1,
                         null,
                         "auto",

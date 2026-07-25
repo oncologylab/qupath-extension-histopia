@@ -15,9 +15,8 @@ semantic-atlas results.
 - configure registration, UNI2-h semantic analysis, CPU/GPU execution
   including explicit `cuda:N` selection, K range, and optional native libvips
   thread limits plus bounded global-fit threads without authoring config files
-- choose a conservative automatic registration worker count capped at four
-  for thumbnail, mask, ordering, and QC work, while retaining an editable
-  override for measured workstation tuning
+- choose conservative automatic registration and QC worker counts capped at
+  four, then tune preprocessing and memory-heavier QC rendering independently
 - validate the selected Python and compute device directly from the extension
 - run registration and global semantic-atlas configs without blocking QuPath
 - stream Python progress, redact review notes from the command log, and cancel
@@ -48,7 +47,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.3.9.jar` from the
+Download `qupath-extension-histopia-0.3.10.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -56,7 +55,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.9.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.10.jar.sha256
 ```
 
 ## Build From Source
@@ -86,12 +85,14 @@ the extension log before a long extraction is started. Leave **VIPS threads**
 blank for libvips' adaptive default, or enter a positive cap after benchmarking
 the target WSI storage and host. The automatic registration-worker value uses
 half the available processors up to a maximum of four; it remains editable for
-measured host-specific tuning and also bounds concurrent registration QC
-renderers. In a measured 24-slide, 1200-pixel mask run, eight workers used
-1.62 GB peak memory and was the practical throughput setting; 16 workers used
-2.55 GB for only another 1.29x speedup. **Fit threads** separately caps native
-BLAS and OpenMP work during the global semantic fit; four is the measured
-conservative default.
+measured host-specific tuning of thumbnail, mask, and section-order work.
+**QC workers** independently bounds concurrent registration diagnostics so an
+eight-worker mask setting does not force eight memory-heavier QC renderers. In
+a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak
+memory and was the practical throughput setting; 16 workers used 2.55 GB for
+only another 1.29x speedup. **Fit threads** separately caps native BLAS and
+OpenMP work during the global semantic fit; four is the measured conservative
+default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available

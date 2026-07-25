@@ -61,6 +61,9 @@ final class HistopiaPanel {
     private final TextField registrationWorkers = new TextField(
             Integer.toString(HistopiaWorkflow.defaultRegistrationWorkers(
                     Runtime.getRuntime().availableProcessors())));
+    private final TextField qcWorkers = new TextField(
+            Integer.toString(HistopiaWorkflow.defaultRegistrationWorkers(
+                    Runtime.getRuntime().availableProcessors())));
     private final TextField clusterMin = new TextField("5");
     private final TextField clusterMax = new TextField("15");
     private final TextField semanticBatchSize = new TextField("64");
@@ -127,6 +130,10 @@ final class HistopiaPanel {
                 "Optional native libvips worker cap; leave blank for adaptive"));
         fitThreads.setTooltip(new Tooltip(
                 "Native BLAS/OpenMP threads used for global atlas fitting"));
+        registrationWorkers.setTooltip(new Tooltip(
+                "Worker cap for thumbnail, tissue-mask, and section-order preparation"));
+        qcWorkers.setTooltip(new Tooltip(
+                "Separate worker cap for memory-heavier registration QC rendering"));
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
         automaticReference.selectedProperty().addListener(
@@ -206,6 +213,7 @@ final class HistopiaPanel {
         var settings = new FlowPane(
                 labeledField("Processed px", processedDimension),
                 labeledField("Registration workers", registrationWorkers),
+                labeledField("QC workers", qcWorkers),
                 labeledField("Device", semanticDevice),
                 labeledField("K min", clusterMin),
                 labeledField("K max", clusterMax),
@@ -581,6 +589,7 @@ final class HistopiaPanel {
                 projectOrder.getValue(),
                 positiveInteger(processedDimension, "Processed image dimension"),
                 positiveInteger(registrationWorkers, "Registration workers"),
+                positiveInteger(qcWorkers, "QC workers"),
                 optionalPath(modelCache),
                 selectedSemanticDevice(),
                 positiveInteger(clusterMin, "K min"),

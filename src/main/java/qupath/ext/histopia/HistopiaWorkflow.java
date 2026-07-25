@@ -125,6 +125,7 @@ final class HistopiaWorkflow {
             String orderStrategy,
             int maxProcessedDimension,
             int workers,
+            int qcWorkers,
             Path modelCache,
             String device,
             int clusterMin,
@@ -139,6 +140,7 @@ final class HistopiaWorkflow {
             throw new IllegalArgumentException("Reference slide must be selected");
         requirePositive(maxProcessedDimension, "Processed image dimension");
         requirePositive(workers, "Registration workers");
+        requirePositive(qcWorkers, "QC workers");
         requirePositive(batchSize, "Semantic batch size");
         requirePositive(patchWorkers, "Patch workers");
         if (vipsThreads != null)
@@ -181,7 +183,7 @@ final class HistopiaWorkflow {
         registration.addProperty("thumbnail_workers", workers);
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
-        registration.addProperty("qc_workers", workers);
+        registration.addProperty("qc_workers", qcWorkers);
         registration.addProperty("preprocessing_cache", true);
         registration.addProperty("alignment_cache", true);
         registration.addProperty("require_approved_masks", true);
