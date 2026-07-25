@@ -45,7 +45,8 @@ class HistopiaWorkflowTest {
                 12,
                 32,
                 2,
-                4);
+                4,
+                6);
 
         var registration = JsonParser.parseString(
                 java.nio.file.Files.readString(files.registrationConfig()))
@@ -69,6 +70,7 @@ class HistopiaWorkflowTest {
         assertEquals("cuda:1", semantic.get("device").getAsString());
         assertEquals(12, semantic.get("cluster_max").getAsInt());
         assertEquals(4, semantic.get("vips_threads").getAsInt());
+        assertEquals(6, semantic.get("fit_threads").getAsInt());
 
         var selection = JsonParser.parseString(
                 java.nio.file.Files.readString(files.selectionManifest()))
@@ -107,7 +109,8 @@ class HistopiaWorkflowTest {
                         10,
                         32,
                         1,
-                        null));
+                        null,
+                        4));
     }
 
     @Test
@@ -132,7 +135,8 @@ class HistopiaWorkflowTest {
                         10,
                         32,
                         1,
-                        0));
+                        0,
+                        4));
     }
 
     @Test
@@ -155,11 +159,39 @@ class HistopiaWorkflowTest {
                 10,
                 32,
                 1,
-                null);
+                null,
+                4);
 
         var semantic = JsonParser.parseString(Files.readString(files.semanticConfig()))
                 .getAsJsonObject();
         assertFalse(semantic.has("vips_threads"));
+        assertEquals(4, semantic.get("fit_threads").getAsInt());
+    }
+
+    @Test
+    void rejectsNonpositiveFitThreads() {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.ndpi"));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.writeConfigs(
+                        tempDir.resolve("analysis"),
+                        List.of(one, two),
+                        null,
+                        "natural",
+                        1200,
+                        1,
+                        null,
+                        "auto",
+                        5,
+                        10,
+                        32,
+                        1,
+                        null,
+                        0));
     }
 
     @Test

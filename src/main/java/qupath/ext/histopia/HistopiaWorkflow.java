@@ -131,7 +131,8 @@ final class HistopiaWorkflow {
             int clusterMax,
             int batchSize,
             int patchWorkers,
-            Integer vipsThreads) throws IOException {
+            Integer vipsThreads,
+            int fitThreads) throws IOException {
         if (slides.size() < 2)
             throw new IllegalArgumentException("Select at least two project slides");
         if (reference != null && !slides.contains(reference))
@@ -142,6 +143,7 @@ final class HistopiaWorkflow {
         requirePositive(patchWorkers, "Patch workers");
         if (vipsThreads != null)
             requirePositive(vipsThreads, "VIPS threads");
+        requirePositive(fitThreads, "Semantic fit threads");
         if (clusterMin <= 1 || clusterMax < clusterMin)
             throw new IllegalArgumentException("Semantic K range is invalid");
         var duplicate = slides.stream()
@@ -199,6 +201,7 @@ final class HistopiaWorkflow {
         semantic.addProperty("patch_workers", patchWorkers);
         if (vipsThreads != null)
             semantic.addProperty("vips_threads", vipsThreads);
+        semantic.addProperty("fit_threads", fitThreads);
 
         var selection = new JsonObject();
         selection.addProperty("format", "histopia-qupath-selection");

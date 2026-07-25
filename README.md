@@ -14,7 +14,7 @@ semantic-atlas results.
   reference as the first order anchor
 - configure registration, UNI2-h semantic analysis, CPU/GPU execution
   including explicit `cuda:N` selection, K range, and optional native libvips
-  thread limits without authoring config files
+  thread limits plus bounded global-fit threads without authoring config files
 - choose a conservative automatic registration worker count capped at four,
   while retaining an editable override for measured workstation tuning
 - validate the selected Python and compute device directly from the extension
@@ -47,7 +47,7 @@ dependencies must already be installed.
 
 ## Install
 
-Download `qupath-extension-histopia-0.3.6.jar` from the
+Download `qupath-extension-histopia-0.3.7.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -55,7 +55,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.6.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.7.jar.sha256
 ```
 
 ## Build From Source
@@ -85,7 +85,9 @@ the extension log before a long extraction is started. Leave **VIPS threads**
 blank for libvips' adaptive default, or enter a positive cap after benchmarking
 the target WSI storage and host. The automatic registration-worker value uses
 half the available processors up to a maximum of four; it remains editable for
-measured host-specific tuning.
+measured host-specific tuning. **Fit threads** separately caps native BLAS and
+OpenMP work during the global semantic fit; four is the measured conservative
+default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available

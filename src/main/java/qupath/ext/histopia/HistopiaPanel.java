@@ -66,6 +66,7 @@ final class HistopiaPanel {
     private final TextField semanticBatchSize = new TextField("64");
     private final TextField patchWorkers = new TextField("1");
     private final TextField vipsThreads = new TextField();
+    private final TextField fitThreads = new TextField("4");
     private final TextField reviewer = new TextField();
     private final TextField reviewNotes = new TextField();
     private final CheckBox automaticReference = new CheckBox("Choose reference automatically");
@@ -124,6 +125,8 @@ final class HistopiaPanel {
         vipsThreads.setPromptText("adaptive");
         vipsThreads.setTooltip(new Tooltip(
                 "Optional native libvips worker cap; leave blank for adaptive"));
+        fitThreads.setTooltip(new Tooltip(
+                "Native BLAS/OpenMP threads used for global atlas fitting"));
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
         automaticReference.selectedProperty().addListener(
@@ -208,7 +211,8 @@ final class HistopiaPanel {
                 labeledField("K max", clusterMax),
                 labeledField("Batch", semanticBatchSize),
                 labeledField("Patch workers", patchWorkers),
-                labeledField("VIPS threads", vipsThreads));
+                labeledField("VIPS threads", vipsThreads),
+                labeledField("Fit threads", fitThreads));
         settings.setHgap(8);
         settings.setVgap(6);
         settings.setPrefWrapLength(820);
@@ -583,7 +587,8 @@ final class HistopiaPanel {
                 positiveInteger(clusterMax, "K max"),
                 positiveInteger(semanticBatchSize, "Semantic batch size"),
                 positiveInteger(patchWorkers, "Patch workers"),
-                optionalPositiveInteger(vipsThreads, "VIPS threads"));
+                optionalPositiveInteger(vipsThreads, "VIPS threads"),
+                positiveInteger(fitThreads, "Semantic fit threads"));
         registrationConfig.setText(files.registrationConfig().toString());
         semanticConfig.setText(files.semanticConfig().toString());
         registration.setText(files.registrationRun().toString());
