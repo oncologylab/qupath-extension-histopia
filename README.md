@@ -88,8 +88,8 @@ the target WSI storage and host. The automatic registration-worker value uses
 half the available processors up to a maximum of four; it remains editable for
 measured host-specific tuning and also bounds concurrent registration QC
 renderers. In a measured 24-slide, 1200-pixel mask run, eight workers used
-1.58 GB peak memory and was the practical throughput setting; 16 workers used
-2.53 GB for only another 1.27x speedup. **Fit threads** separately caps native
+1.62 GB peak memory and was the practical throughput setting; 16 workers used
+2.55 GB for only another 1.29x speedup. **Fit threads** separately caps native
 BLAS and OpenMP work during the global semantic fit; four is the measured
 conservative default.
 
