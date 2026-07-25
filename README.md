@@ -87,8 +87,11 @@ blank for libvips' adaptive default, or enter a positive cap after benchmarking
 the target WSI storage and host. The automatic registration-worker value uses
 half the available processors up to a maximum of four; it remains editable for
 measured host-specific tuning and also bounds concurrent registration QC
-renderers. **Fit threads** separately caps native BLAS and OpenMP work during
-the global semantic fit; four is the measured conservative default.
+renderers. In a measured 24-slide, 1200-pixel mask run, eight workers used
+1.58 GB peak memory and was the practical throughput setting; 16 workers used
+2.53 GB for only another 1.27x speedup. **Fit threads** separately caps native
+BLAS and OpenMP work during the global semantic fit; four is the measured
+conservative default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available
