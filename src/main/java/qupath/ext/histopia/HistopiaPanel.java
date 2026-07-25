@@ -126,12 +126,14 @@ final class HistopiaPanel {
         semanticDevice.getItems().setAll("auto", "cpu", "cuda", "cuda:0", "mps");
         semanticDevice.setEditable(true);
         semanticDevice.setValue("auto");
+        semanticDevice.setTooltip(new Tooltip(
+                "UNI2-h feature-extraction backend; the global atlas fit remains on CPU"));
         vipsThreads.setPromptText("adaptive");
         vipsThreads.setTooltip(new Tooltip(
                 "Optional native libvips worker cap for registration and semantic "
                         + "WSI reads; leave blank for adaptive"));
         fitThreads.setTooltip(new Tooltip(
-                "Native BLAS/OpenMP threads used for global atlas fitting"));
+                "Native CPU BLAS/OpenMP threads used for global atlas fitting"));
         registrationWorkers.setTooltip(new Tooltip(
                 "Worker cap for thumbnail, tissue-mask, and section-order preparation"));
         qcWorkers.setTooltip(new Tooltip(

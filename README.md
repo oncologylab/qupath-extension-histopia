@@ -58,7 +58,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.12.jar` from the
+Download `qupath-extension-histopia-0.3.13.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -66,7 +66,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.12.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.13.jar.sha256
 ```
 
 ## Build From Source
@@ -93,7 +93,10 @@ Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
 control. **Check environment** runs the versioned `histopia-qupath` doctor in
 the selected Python environment and streams dependency, libvips, backend, and
 accelerator details to the extension log. Registration, semantic analysis, and
-export run their narrower preflight automatically before starting. Leave
+export run their narrower preflight automatically before starting. The device
+control applies to UNI2-h feature extraction. The global PCA, correspondence,
+batch correction, K selection, and topology fit remain on the validated CPU
+implementation, so an idle accelerator during that stage is expected. Leave
 **VIPS threads**
 blank for libvips' adaptive default, or enter a positive cap shared by
 registration WSI reads and semantic extraction after benchmarking the target
@@ -109,8 +112,8 @@ eight-worker mask setting does not force eight memory-heavier QC renderers. In
 a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak
 memory and was the practical throughput setting; 16 workers used 2.55 GB for
 only another 1.29x speedup. **Fit threads** separately caps native BLAS and
-OpenMP work during the global semantic fit; four is the measured conservative
-default.
+OpenMP CPU work during the global semantic fit; four is the measured
+conservative default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available
