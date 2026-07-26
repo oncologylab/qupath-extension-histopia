@@ -4,7 +4,9 @@ import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -126,6 +129,65 @@ class HistopiaPythonContractTest {
         assertEquals(0, semanticHelp.exitCode(), semanticHelp.output());
         assertTrue(semanticHelp.output().contains("--allow-model-download"));
         assertTrue(semanticHelp.output().contains("--fit-threads"));
+    }
+
+    @Test
+    void cancelledInstalledHistopiaCheckpointsInterruptedStage() throws Exception {
+        var python = System.getenv("HISTOPIA_PYTHON");
+        assumeTrue(
+                python != null && !python.isBlank(),
+                "HISTOPIA_PYTHON enables the installed-package contract test");
+        var output = temporaryDirectory.resolve("cancelled-registration");
+        var script = """
+                import sys
+                import time
+                from histopia._signals import graceful_sigterm
+                from histopia.registration._performance import RegistrationPerformance
+
+                performance = RegistrationPerformance(sys.argv[1], {})
+                with graceful_sigterm():
+                    try:
+                        performance.start_stage("slide_discovery")
+                        print("READY", flush=True)
+                        while True:
+                            time.sleep(1)
+                    except BaseException as error:
+                        performance.fail(error)
+                        raise
+                """;
+        var process = new ProcessBuilder(
+                python,
+                "-u",
+                "-c",
+                script,
+                output.toString())
+                .redirectErrorStream(true)
+                .start();
+        try (var reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            assertEquals("READY", reader.readLine());
+            HistopiaProcess.cancelTree(process);
+            assertTrue(
+                    process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS),
+                    "cancelled Histopia process did not exit");
+            assertEquals(143, process.exitValue());
+            assertNull(reader.readLine());
+        } finally {
+            if (process.isAlive())
+                HistopiaProcess.cancelTree(process, Duration.ZERO);
+        }
+
+        var performance = JsonParser.parseString(
+                Files.readString(output.resolve("registration_performance.json")))
+                .getAsJsonObject();
+        assertEquals("interrupted", performance.get("status").getAsString());
+        assertEquals("SystemExit", performance.get("failure_type").getAsString());
+        assertEquals(
+                "interrupted",
+                performance.getAsJsonObject("stages")
+                        .getAsJsonObject("slide_discovery")
+                        .get("status")
+                        .getAsString());
     }
 
     private static CommandResult run(List<String> command)

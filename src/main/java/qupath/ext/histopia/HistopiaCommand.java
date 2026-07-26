@@ -25,6 +25,7 @@ final class HistopiaCommand {
             throw new IllegalArgumentException("Python executable must not be blank");
         var command = new ArrayList<>(List.of(
                 python,
+                "-u",
                 "-m",
                 "histopia.qupath._cli",
                 "--registration-run",
@@ -223,7 +224,7 @@ final class HistopiaCommand {
             List<String> arguments) {
         if (python == null || python.isBlank())
             throw new IllegalArgumentException("Python executable must not be blank");
-        var command = new ArrayList<>(List.of(python, "-m", module));
+        var command = new ArrayList<>(List.of(python, "-u", "-m", module));
         command.addAll(arguments);
         return List.copyOf(command);
     }

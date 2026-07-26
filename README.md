@@ -22,8 +22,9 @@ semantic-atlas results.
 - run workflow-specific environment preflight automatically before
   registration, semantic analysis, and interchange export
 - run registration and global semantic-atlas configs without blocking QuPath
-- stream Python progress, redact review notes from the command log, and cancel
-  the complete Python process tree with bounded force escalation
+- stream unbuffered Python progress, redact review notes from the command log,
+  and cancel the complete Python process tree with bounded force escalation;
+  current Histopia CLIs checkpoint cancelled stages as interrupted
 - build and open one local staged mask/order QC portal
 - record separate fingerprint-bound mask and order approvals before final
   registration sealing
@@ -60,7 +61,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.16.jar` from the
+Download `qupath-extension-histopia-0.3.17.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -68,7 +69,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.16.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.17.jar.sha256
 ```
 
 ## Build From Source

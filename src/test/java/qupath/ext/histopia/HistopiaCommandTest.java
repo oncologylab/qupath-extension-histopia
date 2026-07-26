@@ -3,6 +3,7 @@ package qupath.ext.histopia;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,10 +22,10 @@ class HistopiaCommandTest {
                 7);
 
         assertEquals("python", command.get(0));
-        assertEquals("histopia.qupath._cli", command.get(2));
+        assertPythonModule(command, "histopia.qupath._cli");
         assertEquals("7", command.get(command.indexOf("--clusters") + 1));
         assertEquals("regions", command.get(command.indexOf("--semantic-geometry") + 1));
-        assertEquals(Path.of("registration run").toAbsolutePath().toString(), command.get(4));
+        assertEquals(Path.of("registration run").toAbsolutePath().toString(), command.get(5));
     }
 
     @Test
@@ -42,11 +43,11 @@ class HistopiaCommandTest {
         var semantic = HistopiaCommand.runSemantic(
                 "python", Path.of("semantic.toml"), true);
 
-        assertEquals("histopia.registration._cli", registration.get(2));
-        assertEquals("--config", registration.get(3));
+        assertPythonModule(registration, "histopia.registration._cli");
+        assertEquals("--config", registration.get(4));
         assertEquals("--staged", registration.get(registration.size() - 1));
-        assertEquals("histopia.semantic._cli", semantic.get(2));
-        assertEquals("run", semantic.get(3));
+        assertPythonModule(semantic, "histopia.semantic._cli");
+        assertEquals("run", semantic.get(4));
         assertEquals("--allow-model-download", semantic.get(semantic.size() - 1));
     }
 
@@ -55,8 +56,8 @@ class HistopiaCommandTest {
         var command = HistopiaCommand.inspectEnvironment(
                 "python", " CUDA:2 ", "semantic");
 
-        assertEquals("histopia.qupath._cli", command.get(2));
-        assertEquals("--doctor", command.get(3));
+        assertPythonModule(command, "histopia.qupath._cli");
+        assertEquals("--doctor", command.get(4));
         assertEquals("semantic", command.get(command.indexOf("--workflow") + 1));
         assertEquals("cuda:2", command.get(command.indexOf("--device") + 1));
         assertEquals("1", command.get(command.indexOf("--require-api") + 1));
@@ -84,8 +85,8 @@ class HistopiaCommandTest {
                 "Reviewer Name",
                 "Masks and physical order reviewed");
 
-        assertEquals("histopia.registration._cli", command.get(2));
-        assertEquals("--approve-run", command.get(3));
+        assertPythonModule(command, "histopia.registration._cli");
+        assertEquals("--approve-run", command.get(4));
         assertEquals("Reviewer Name", command.get(command.indexOf("--reviewer") + 1));
         assertEquals(
                 "Masks and physical order reviewed",
@@ -99,8 +100,10 @@ class HistopiaCommandTest {
         var order = HistopiaCommand.approveOrder(
                 "python", Path.of("registration run"), "Reviewer", "Order reviewed");
 
-        assertEquals("--approve-masks", masks.get(3));
-        assertEquals("--approve-order", order.get(3));
+        assertPythonModule(masks, "histopia.registration._cli");
+        assertPythonModule(order, "histopia.registration._cli");
+        assertEquals("--approve-masks", masks.get(4));
+        assertEquals("--approve-order", order.get(4));
         assertEquals("Reviewer", masks.get(masks.indexOf("--reviewer") + 1));
         assertEquals("Order reviewed", order.get(order.indexOf("--review-notes") + 1));
     }
@@ -113,8 +116,8 @@ class HistopiaCommandTest {
                 Path.of("review output"),
                 4);
 
-        assertEquals("histopia.visualization._cli", command.get(2));
-        assertEquals("registration-review", command.get(3));
+        assertPythonModule(command, "histopia.visualization._cli");
+        assertEquals("registration-review", command.get(4));
         assertEquals("4", command.get(command.indexOf("--workers") + 1));
         assertThrows(
                 IllegalArgumentException.class,
@@ -136,14 +139,14 @@ class HistopiaCommandTest {
                 "Reviewer Name",
                 "Reviewed K sensitivity and topology");
 
-        assertEquals("histopia.visualization._cli", review.get(2));
-        assertEquals("build", review.get(3));
+        assertPythonModule(review, "histopia.visualization._cli");
+        assertEquals("build", review.get(4));
         assertEquals(
                 "qupath=" + Path.of("semantic run").toAbsolutePath(),
                 review.get(review.indexOf("--semantic-run") + 1));
         assertEquals("3", review.get(review.indexOf("--workers") + 1));
-        assertEquals("histopia.semantic._cli", approval.get(2));
-        assertEquals("approve", approval.get(3));
+        assertPythonModule(approval, "histopia.semantic._cli");
+        assertEquals("approve", approval.get(4));
         assertEquals(
                 "Reviewer Name",
                 approval.get(approval.indexOf("--reviewer") + 1));
@@ -163,5 +166,11 @@ class HistopiaCommandTest {
         assertTrue(displayed.contains("--review-notes <redacted>"));
         assertFalse(displayed.contains("private review notes"));
         assertTrue(displayed.contains("semantic run"));
+    }
+
+    private static void assertPythonModule(List<String> command, String module) {
+        assertEquals("-u", command.get(1));
+        assertEquals("-m", command.get(2));
+        assertEquals(module, command.get(3));
     }
 }
