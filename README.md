@@ -69,7 +69,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.23.jar` from the
+Download `qupath-extension-histopia-0.3.24.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -77,7 +77,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.23.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.24.jar.sha256
 ```
 
 ## Build From Source
