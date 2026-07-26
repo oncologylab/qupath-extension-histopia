@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  HISTOPIA_REF: 8d3ae653a7653dc0d441f7892a06ba2c50be6428
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,10 +28,23 @@ jobs:
           java-version: "21"
           distribution: temurin
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Histopia contract
+        run: >-
+          python -m pip install
+          "histopia[qupath] @
+          git+https://github.com/oncologylab/histopia.git@${HISTOPIA_REF}"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build with Gradle
+        env:
+          HISTOPIA_PYTHON: python
         run: ./gradlew build
 
       - name: Upload build artifacts

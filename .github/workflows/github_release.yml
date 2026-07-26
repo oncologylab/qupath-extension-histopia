@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Version tag to create, for example v0.3.15
+        description: Version tag to create, for example v0.3.16
         required: true
         type: string
+
+env:
+  HISTOPIA_REF: 8d3ae653a7653dc0d441f7892a06ba2c50be6428
 
 jobs:
   build:
@@ -23,17 +26,30 @@ jobs:
           java-version: "21"
           distribution: temurin
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Histopia contract
+        run: >-
+          python -m pip install
+          "histopia[qupath] @
+          git+https://github.com/oncologylab/histopia.git@${HISTOPIA_REF}"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build with Gradle
+        env:
+          HISTOPIA_PYTHON: python
         run: ./gradlew build
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
         with:
           name: qupath-extension-histopia-release
-          path: build/libs/qupath-extension-histopia-0.3.15.jar
+          path: build/libs/qupath-extension-histopia-0.3.16.jar
           retention-days: 7
 
   release:
@@ -50,9 +66,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          test "$RELEASE_TAG" = "v0.3.15"
-          sha256sum qupath-extension-histopia-0.3.15.jar \
-            > qupath-extension-histopia-0.3.15.jar.sha256
+          test "$RELEASE_TAG" = "v0.3.16"
+          sha256sum qupath-extension-histopia-0.3.16.jar \
+            > qupath-extension-histopia-0.3.16.jar.sha256
 
       - name: Create draft release
         env:
@@ -64,6 +80,6 @@ jobs:
             --target "$GITHUB_SHA" \
             --draft \
             --generate-notes \
-            --title "Histopia for QuPath 0.3.15" \
-            qupath-extension-histopia-0.3.15.jar \
-            qupath-extension-histopia-0.3.15.jar.sha256
+            --title "Histopia for QuPath 0.3.16" \
+            qupath-extension-histopia-0.3.16.jar \
+            qupath-extension-histopia-0.3.16.jar.sha256

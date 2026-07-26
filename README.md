@@ -60,7 +60,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.15.jar` from the
+Download `qupath-extension-histopia-0.3.16.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -68,7 +68,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.15.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.16.jar.sha256
 ```
 
 ## Build From Source
@@ -78,6 +78,8 @@ sha256sum --check qupath-extension-histopia-0.3.15.jar.sha256
 ```
 
 The installable JAR is written under `build/libs`.
+Continuous integration also installs a pinned Histopia revision and executes
+the Java-generated registration and semantic configs against that package.
 
 The **Project workflow** tab lists supported local WSI entries from the open
 QuPath project. Select at least two slides, choose a workspace and optional
