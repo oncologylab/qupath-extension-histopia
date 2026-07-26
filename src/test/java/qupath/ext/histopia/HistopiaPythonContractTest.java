@@ -73,6 +73,7 @@ class HistopiaPythonContractTest {
                         "reference_slide": registration.reference_slide,
                         "section_order_strategy": registration.section_order_strategy,
                         "mask_workers": registration.mask_workers,
+                        "rigid_workers": registration.rigid_workers,
                         "qc_workers": registration.qc_workers,
                         "alignment_qc_mode": registration.alignment_qc_mode,
                         "require_approved_masks": registration.require_approved_masks,
@@ -103,6 +104,7 @@ class HistopiaPythonContractTest {
                 "anchored_similarity",
                 registration.get("section_order_strategy").getAsString());
         assertEquals(2, registration.get("mask_workers").getAsInt());
+        assertEquals(2, registration.get("rigid_workers").getAsInt());
         assertEquals(1, registration.get("qc_workers").getAsInt());
         assertEquals("review", registration.get("alignment_qc_mode").getAsString());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());

@@ -142,7 +142,8 @@ final class HistopiaPanel {
         fitThreads.setTooltip(new Tooltip(
                 "Native CPU BLAS/OpenMP threads used for global atlas fitting"));
         registrationWorkers.setTooltip(new Tooltip(
-                "Worker cap for thumbnail, tissue-mask, and section-order preparation"));
+                "Worker cap for thumbnail, tissue-mask, section-order, and rigid-pair "
+                        + "registration work"));
         qcWorkers.setTooltip(new Tooltip(
                 "Separate worker cap for memory-heavier registration QC rendering"));
         alignmentQcMode.getItems().setAll("review", "none", "full");

@@ -244,6 +244,7 @@ final class HistopiaWorkflow {
         registration.addProperty("thumbnail_workers", workers);
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
+        registration.addProperty("rigid_workers", workers);
         registration.addProperty("qc_workers", qcWorkers);
         registration.addProperty("alignment_qc_mode", alignmentQcMode);
         if (vipsThreads != null)

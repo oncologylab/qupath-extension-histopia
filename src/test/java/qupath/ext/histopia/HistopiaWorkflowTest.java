@@ -68,6 +68,7 @@ class HistopiaWorkflowTest {
         assertEquals(4, registration.get("thumbnail_workers").getAsInt());
         assertEquals(4, registration.get("mask_workers").getAsInt());
         assertEquals(4, registration.get("ordering_workers").getAsInt());
+        assertEquals(4, registration.get("rigid_workers").getAsInt());
         assertEquals(2, registration.get("qc_workers").getAsInt());
         assertEquals("full", registration.get("alignment_qc_mode").getAsString());
         assertEquals(4, registration.get("vips_threads").getAsInt());

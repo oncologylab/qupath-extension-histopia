@@ -16,7 +16,8 @@ semantic-atlas results.
   including explicit `cuda:N` selection, K range, and optional native libvips
   thread limits plus bounded global-fit threads without authoring config files
 - choose conservative automatic registration and QC worker counts capped at
-  four, then tune preprocessing and memory-heavier QC rendering independently
+  four, then tune preprocessing, rigid-pair estimation, and memory-heavier QC
+  rendering independently
 - choose `review`, `none`, or `full` registration QC detail, with the
   production `review` tier retaining primary per-slide panels without
   generating every forensic pair diagnostic
@@ -67,7 +68,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.20.jar` from the
+Download `qupath-extension-histopia-0.3.21.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -75,7 +76,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.20.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.21.jar.sha256
 ```
 
 ## Build From Source
@@ -131,7 +132,10 @@ measured host-specific tuning of thumbnail, mask, and section-order work.
 On one validated 17,280 x 17,664 SCN export, eight native threads completed in
 5.17 seconds at 598 MiB peak RSS, while sixteen took 5.25 seconds at 839 MiB;
 the generated TIFFs were byte-identical. This is measured guidance, not a
-portable default.
+portable default. The registration-worker control also bounds independent
+rigid feature preparation and reference/adjacent pair estimation. Four workers
+reduced rigid alignment from 9.32 to 3.25 seconds on one 24-slide benchmark
+without changing the registration result.
 **QC workers** independently bounds concurrent registration diagnostics so an
 eight-worker mask setting does not force eight memory-heavier QC renderers. In
 a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak
