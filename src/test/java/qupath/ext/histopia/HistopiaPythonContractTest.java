@@ -46,6 +46,7 @@ class HistopiaPythonContractTest {
                 1200,
                 2,
                 1,
+                "review",
                 modelCache,
                 "cpu",
                 5,
@@ -70,6 +71,7 @@ class HistopiaPythonContractTest {
                         "section_order_strategy": registration.section_order_strategy,
                         "mask_workers": registration.mask_workers,
                         "qc_workers": registration.qc_workers,
+                        "alignment_qc_mode": registration.alignment_qc_mode,
                         "require_approved_masks": registration.require_approved_masks,
                         "require_approved_order": registration.require_approved_order,
                     },
@@ -99,6 +101,7 @@ class HistopiaPythonContractTest {
                 registration.get("section_order_strategy").getAsString());
         assertEquals(2, registration.get("mask_workers").getAsInt());
         assertEquals(1, registration.get("qc_workers").getAsInt());
+        assertEquals("review", registration.get("alignment_qc_mode").getAsString());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
         assertEquals("cpu", semantic.get("device").getAsString());

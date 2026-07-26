@@ -17,6 +17,9 @@ semantic-atlas results.
   thread limits plus bounded global-fit threads without authoring config files
 - choose conservative automatic registration and QC worker counts capped at
   four, then tune preprocessing and memory-heavier QC rendering independently
+- choose `review`, `none`, or `full` registration QC detail, with the
+  production `review` tier retaining primary per-slide panels without
+  generating every forensic pair diagnostic
 - validate the selected Histopia workflow API, Python dependencies, native
   libvips runtime, and compute device directly from the extension
 - run workflow-specific environment preflight automatically before
@@ -61,7 +64,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.18.jar` from the
+Download `qupath-extension-histopia-0.3.19.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -69,7 +72,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.18.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.19.jar.sha256
 ```
 
 ## Build From Source
@@ -125,9 +128,16 @@ portable default.
 eight-worker mask setting does not force eight memory-heavier QC renderers. In
 a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak
 memory and was the practical throughput setting; 16 workers used 2.55 GB for
-only another 1.29x speedup. **Fit threads** separately caps native BLAS and
-OpenMP CPU work during the global semantic fit; four is the measured
-conservative default.
+only another 1.29x speedup. **QC detail** controls which alignment diagnostics
+are retained. `review` is the production default and keeps primary slide panels
+plus non-rigid acceptance panels. `full` adds pair, crop, blend, checkerboard,
+and contact diagnostics for algorithm debugging. `none` skips post-mask
+alignment imagery while retaining transforms, metrics, and export support. On
+a representative 24-slide run, `review` reduced registration-plus-QC time from
+69.83 to 10.97 seconds and retained artifact volume from 1.278 GB to 437 MB,
+with byte-identical registration results and primary panels. **Fit threads**
+separately caps native BLAS and OpenMP CPU work during the global semantic fit;
+four is the measured conservative default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available

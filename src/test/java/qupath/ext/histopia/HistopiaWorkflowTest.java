@@ -41,6 +41,7 @@ class HistopiaWorkflowTest {
                 1200,
                 4,
                 2,
+                "full",
                 tempDir.resolve("models"),
                 " CUDA:1 ",
                 5,
@@ -68,6 +69,7 @@ class HistopiaWorkflowTest {
         assertEquals(4, registration.get("mask_workers").getAsInt());
         assertEquals(4, registration.get("ordering_workers").getAsInt());
         assertEquals(2, registration.get("qc_workers").getAsInt());
+        assertEquals("full", registration.get("alignment_qc_mode").getAsString());
         assertEquals(4, registration.get("vips_threads").getAsInt());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
@@ -110,6 +112,7 @@ class HistopiaWorkflowTest {
                 1200,
                 2,
                 1,
+                "review",
                 tempDir.resolve("models-a"),
                 "cpu",
                 5,
@@ -190,6 +193,7 @@ class HistopiaWorkflowTest {
                         1200,
                         1,
                         1,
+                        "review",
                         null,
                         "auto",
                         5,
@@ -218,6 +222,7 @@ class HistopiaWorkflowTest {
                         1200,
                         1,
                         1,
+                        "review",
                         null,
                         "auto",
                         5,
@@ -245,6 +250,7 @@ class HistopiaWorkflowTest {
                         1200,
                         1,
                         1,
+                        "review",
                         null,
                         "auto",
                         5,
@@ -272,6 +278,7 @@ class HistopiaWorkflowTest {
                         1200,
                         4,
                         0,
+                        "review",
                         null,
                         "auto",
                         5,
@@ -298,6 +305,7 @@ class HistopiaWorkflowTest {
                 1200,
                 1,
                 1,
+                "none",
                 null,
                 "auto",
                 5,
@@ -312,6 +320,7 @@ class HistopiaWorkflowTest {
         var semantic = JsonParser.parseString(Files.readString(files.semanticConfig()))
                 .getAsJsonObject();
         assertFalse(registration.has("vips_threads"));
+        assertEquals("none", registration.get("alignment_qc_mode").getAsString());
         assertFalse(semantic.has("vips_threads"));
         assertEquals(4, semantic.get("fit_threads").getAsInt());
     }
@@ -333,6 +342,7 @@ class HistopiaWorkflowTest {
                         1200,
                         1,
                         1,
+                        "review",
                         null,
                         "auto",
                         5,
@@ -359,6 +369,19 @@ class HistopiaWorkflowTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> HistopiaWorkflow.normalizeDevice("cuda:١"));
+    }
+
+    @Test
+    void validatesAlignmentQcModeSyntax() {
+        assertEquals("review", HistopiaWorkflow.normalizeAlignmentQcMode(" REVIEW "));
+        assertEquals("none", HistopiaWorkflow.normalizeAlignmentQcMode("none"));
+        assertEquals("full", HistopiaWorkflow.normalizeAlignmentQcMode("full"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeAlignmentQcMode("debug"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.normalizeAlignmentQcMode(" "));
     }
 
     @Test

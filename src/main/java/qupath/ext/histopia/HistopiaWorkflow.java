@@ -30,6 +30,8 @@ final class HistopiaWorkflow {
             Set.of(".ndpi", ".scn", ".svs", ".tif", ".tiff");
     private static final Set<String> SECTION_ORDER_STRATEGIES =
             Set.of("anchored_similarity", "similarity", "natural");
+    private static final Set<String> ALIGNMENT_QC_MODES =
+            Set.of("review", "none", "full");
     private static final Set<String> REGISTRATION_SEAL_ARTIFACTS = Set.of(
             "registration_result.json",
             "mask_review.json",
@@ -139,6 +141,16 @@ final class HistopiaWorkflow {
                         availableProcessors / 2));
     }
 
+    static String normalizeAlignmentQcMode(String mode) {
+        if (mode == null)
+            throw new IllegalArgumentException("Registration QC detail must not be blank");
+        var normalized = mode.strip().toLowerCase(Locale.ROOT);
+        if (ALIGNMENT_QC_MODES.contains(normalized))
+            return normalized;
+        throw new IllegalArgumentException(
+                "Registration QC detail must be review, none, or full");
+    }
+
     static WorkflowFiles workflowFiles(Path workspace) {
         workspace = workspace.toAbsolutePath().normalize();
         var metadataDir = workspace.resolve(".histopia");
@@ -158,6 +170,7 @@ final class HistopiaWorkflow {
             int maxProcessedDimension,
             int workers,
             int qcWorkers,
+            String alignmentQcMode,
             Path modelCache,
             String device,
             int clusterMin,
@@ -174,6 +187,7 @@ final class HistopiaWorkflow {
         requirePositive(workers, "Registration workers");
         requirePositive(qcWorkers, "QC workers");
         requireOrderStrategy(orderStrategy);
+        alignmentQcMode = normalizeAlignmentQcMode(alignmentQcMode);
         var duplicate = slides.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
                         ProjectSlide::filename,
@@ -208,6 +222,7 @@ final class HistopiaWorkflow {
         registration.addProperty("mask_workers", workers);
         registration.addProperty("ordering_workers", workers);
         registration.addProperty("qc_workers", qcWorkers);
+        registration.addProperty("alignment_qc_mode", alignmentQcMode);
         if (vipsThreads != null)
             registration.addProperty("vips_threads", vipsThreads);
         registration.addProperty("preprocessing_cache", true);

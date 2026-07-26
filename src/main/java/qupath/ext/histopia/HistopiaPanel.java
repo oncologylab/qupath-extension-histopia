@@ -68,6 +68,7 @@ final class HistopiaPanel {
     private final TextField qcWorkers = new TextField(
             Integer.toString(HistopiaWorkflow.defaultRegistrationWorkers(
                     Runtime.getRuntime().availableProcessors())));
+    private final ComboBox<String> alignmentQcMode = new ComboBox<>();
     private final TextField clusterMin = new TextField("5");
     private final TextField clusterMax = new TextField("15");
     private final TextField semanticBatchSize = new TextField("64");
@@ -142,6 +143,11 @@ final class HistopiaPanel {
                 "Worker cap for thumbnail, tissue-mask, and section-order preparation"));
         qcWorkers.setTooltip(new Tooltip(
                 "Separate worker cap for memory-heavier registration QC rendering"));
+        alignmentQcMode.getItems().setAll("review", "none", "full");
+        alignmentQcMode.setValue("review");
+        alignmentQcMode.setTooltip(new Tooltip(
+                "Review writes primary slide panels; full adds forensic pair diagnostics; "
+                        + "none skips post-mask alignment images"));
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
         automaticReference.selectedProperty().addListener(
@@ -223,6 +229,7 @@ final class HistopiaPanel {
                 labeledField("Processed px", processedDimension),
                 labeledField("Registration workers", registrationWorkers),
                 labeledField("QC workers", qcWorkers),
+                labeledField("QC detail", alignmentQcMode),
                 labeledField("Device", semanticDevice),
                 labeledField("K min", clusterMin),
                 labeledField("K max", clusterMax),
@@ -656,6 +663,7 @@ final class HistopiaPanel {
                 positiveInteger(processedDimension, "Processed image dimension"),
                 positiveInteger(registrationWorkers, "Registration workers"),
                 positiveInteger(qcWorkers, "QC workers"),
+                HistopiaWorkflow.normalizeAlignmentQcMode(alignmentQcMode.getValue()),
                 optionalPath(modelCache),
                 selectedSemanticDevice(),
                 positiveInteger(clusterMin, "K min"),
