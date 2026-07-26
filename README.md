@@ -35,7 +35,7 @@ semantic-atlas results.
 - bind registration QC and every approval to the slide cohort inside the
   current stage artifacts, hiding stages left by an earlier workspace run
 - build and open the semantic 3D/QC viewer, then record fingerprint-bound
-  semantic approval
+  semantic approval only after revalidating the exact current registration
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
@@ -61,7 +61,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.17.jar` from the
+Download `qupath-extension-histopia-0.3.18.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -69,7 +69,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.17.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.18.jar.sha256
 ```
 
 ## Build From Source

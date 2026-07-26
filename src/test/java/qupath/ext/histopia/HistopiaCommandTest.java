@@ -135,6 +135,7 @@ class HistopiaCommandTest {
                 3);
         var approval = HistopiaCommand.approveSemantic(
                 "python",
+                Path.of("registration run"),
                 Path.of("semantic run"),
                 "Reviewer Name",
                 "Reviewed K sensitivity and topology");
@@ -148,6 +149,9 @@ class HistopiaCommandTest {
         assertPythonModule(approval, "histopia.semantic._cli");
         assertEquals("approve", approval.get(4));
         assertEquals(
+                Path.of("registration run").toAbsolutePath().toString(),
+                approval.get(approval.indexOf("--registration-run") + 1));
+        assertEquals(
                 "Reviewer Name",
                 approval.get(approval.indexOf("--reviewer") + 1));
     }
@@ -156,6 +160,7 @@ class HistopiaCommandTest {
     void redactsReviewNotesFromDisplayedCommand() {
         var command = HistopiaCommand.approveSemantic(
                 "python",
+                Path.of("registration run"),
                 Path.of("semantic run"),
                 "Reviewer Name",
                 "private review notes");

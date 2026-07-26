@@ -149,6 +149,7 @@ final class HistopiaCommand {
 
     static List<String> approveSemantic(
             String python,
+            Path registrationRun,
             Path semanticRun,
             String reviewer,
             String notes) {
@@ -159,6 +160,8 @@ final class HistopiaCommand {
                         "approve",
                         "--run",
                         semanticRun.toAbsolutePath().toString(),
+                        "--registration-run",
+                        registrationRun.toAbsolutePath().toString(),
                         "--reviewer",
                         reviewer,
                         "--review-notes",

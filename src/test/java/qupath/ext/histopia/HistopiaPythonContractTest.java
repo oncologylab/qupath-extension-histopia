@@ -129,6 +129,12 @@ class HistopiaPythonContractTest {
         assertEquals(0, semanticHelp.exitCode(), semanticHelp.output());
         assertTrue(semanticHelp.output().contains("--allow-model-download"));
         assertTrue(semanticHelp.output().contains("--fit-threads"));
+        var semanticApprovalHelp = run(List.of(
+                python, "-m", "histopia.semantic._cli", "approve", "--help"));
+        assertEquals(
+                0, semanticApprovalHelp.exitCode(), semanticApprovalHelp.output());
+        assertTrue(
+                semanticApprovalHelp.output().contains("--registration-run"));
     }
 
     @Test

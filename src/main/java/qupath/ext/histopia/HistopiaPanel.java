@@ -581,6 +581,7 @@ final class HistopiaPanel {
                     "Semantic approval",
                     HistopiaCommand.approveSemantic(
                             python.getText(),
+                            registrationRun,
                             semanticRun,
                             requiredText(reviewer, "Reviewer"),
                             requiredText(reviewNotes, "Review notes")));
