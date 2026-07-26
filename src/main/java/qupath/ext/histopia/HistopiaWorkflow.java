@@ -78,8 +78,30 @@ final class HistopiaWorkflow {
             Path registrationConfig,
             Path semanticConfig,
             Path selectionManifest,
+            Path workflowAudit,
             Path registrationRun,
             Path semanticRun) {
+    }
+
+    record WorkflowAuditSummary(
+            String status,
+            int cohortCount,
+            int approved,
+            int reviewRequired,
+            int incomplete,
+            int invalid) {
+
+        String displayStatus() {
+            return switch (status) {
+                case "approved" -> "Workflow integrity approved";
+                case "review_required" ->
+                        "Workflow integrity valid; scientific review required";
+                case "incomplete" -> "Workflow integrity incomplete";
+                case "invalid" -> "Workflow integrity invalid";
+                default -> throw new IllegalStateException(
+                        "Unsupported workflow audit status: " + status);
+            };
+        }
     }
 
     static ProjectSelection discover(Project<BufferedImage> project) {
@@ -158,6 +180,7 @@ final class HistopiaWorkflow {
                 metadataDir.resolve("registration-config.json"),
                 metadataDir.resolve("semantic-config.json"),
                 metadataDir.resolve("qupath-selection.json"),
+                metadataDir.resolve("workflow-audit.json"),
                 workspace.resolve("registration"),
                 workspace.resolve("semantic"));
     }
@@ -323,6 +346,48 @@ final class HistopiaWorkflow {
         if (Files.isRegularFile(registrationRun.resolve("mask_review.json")))
             return "Tissue mask review required";
         return "Registration completed without review artifacts";
+    }
+
+    static WorkflowAuditSummary readWorkflowAudit(Path path) throws IOException {
+        var payload = readObject(path);
+        if (!hasIntegerValue(payload, "schema_version", 1)
+                || !hasNonblankString(payload, "status"))
+            throw new IllegalArgumentException("Workflow audit schema is invalid");
+        var status = payload.get("status").getAsString();
+        if (!Set.of("approved", "review_required", "incomplete", "invalid")
+                .contains(status))
+            throw new IllegalArgumentException("Workflow audit status is invalid");
+        var summaryElement = payload.get("summary");
+        var cohortsElement = payload.get("cohorts");
+        if (summaryElement == null
+                || !summaryElement.isJsonObject()
+                || cohortsElement == null
+                || !cohortsElement.isJsonArray())
+            throw new IllegalArgumentException("Workflow audit summary is invalid");
+        var summary = summaryElement.getAsJsonObject();
+        var cohortCount = nonnegativeInteger(summary, "cohort_count");
+        var approved = nonnegativeInteger(summary, "approved");
+        var reviewRequired = nonnegativeInteger(summary, "review_required");
+        var incomplete = nonnegativeInteger(summary, "incomplete");
+        var invalid = nonnegativeInteger(summary, "invalid");
+        if (cohortCount < 1
+                || cohortsElement.getAsJsonArray().size() != cohortCount
+                || approved + reviewRequired + incomplete + invalid != cohortCount)
+            throw new IllegalArgumentException("Workflow audit counts are invalid");
+        var expectedStatus = invalid > 0
+                ? "invalid"
+                : incomplete > 0
+                        ? "incomplete"
+                        : reviewRequired > 0 ? "review_required" : "approved";
+        if (!expectedStatus.equals(status))
+            throw new IllegalArgumentException("Workflow audit status is inconsistent");
+        return new WorkflowAuditSummary(
+                status,
+                cohortCount,
+                approved,
+                reviewRequired,
+                incomplete,
+                invalid);
     }
 
     static boolean registrationStageMatchesSelection(
@@ -624,6 +689,27 @@ final class HistopiaWorkflow {
                 && value.isJsonPrimitive()
                 && value.getAsJsonPrimitive().isNumber()
                 && value.getAsBigDecimal().compareTo(java.math.BigDecimal.valueOf(expected)) == 0;
+    }
+
+    private static int nonnegativeInteger(JsonObject object, String key) {
+        var value = object.get(key);
+        if (value == null
+                || !value.isJsonPrimitive()
+                || !value.getAsJsonPrimitive().isNumber())
+            throw new IllegalArgumentException(
+                    "Workflow audit " + key + " must be a nonnegative integer");
+        final int parsed;
+        try {
+            parsed = value.getAsBigDecimal().intValueExact();
+        } catch (ArithmeticException | NumberFormatException error) {
+            throw new IllegalArgumentException(
+                    "Workflow audit " + key + " must be a nonnegative integer",
+                    error);
+        }
+        if (parsed < 0)
+            throw new IllegalArgumentException(
+                    "Workflow audit " + key + " must be a nonnegative integer");
+        return parsed;
     }
 
     private static boolean hasBooleanValue(

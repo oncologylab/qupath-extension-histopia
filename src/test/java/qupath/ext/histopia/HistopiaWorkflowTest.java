@@ -95,6 +95,11 @@ class HistopiaWorkflowTest {
                 files.selectionManifest(), List.of(first, second)));
         assertFalse(HistopiaWorkflow.selectionManifestMatches(
                 files.selectionManifest(), List.of(first)));
+        assertEquals(
+                tempDir.resolve("analysis/.histopia/workflow-audit.json")
+                        .toAbsolutePath()
+                        .normalize(),
+                files.workflowAudit());
     }
 
     @Test
@@ -723,6 +728,67 @@ class HistopiaWorkflowTest {
         assertEquals(
                 "Registration seal stale; final review required",
                 HistopiaWorkflow.registrationStatus(run));
+    }
+
+    @Test
+    void parsesOnlyConsistentWorkflowAuditSummaries() throws Exception {
+        var audit = tempDir.resolve("workflow-audit.json");
+        Files.writeString(
+                audit,
+                """
+                {
+                  "schema_version": 1,
+                  "status": "review_required",
+                  "summary": {
+                    "cohort_count": 1,
+                    "approved": 0,
+                    "review_required": 1,
+                    "incomplete": 0,
+                    "invalid": 0,
+                    "viewer_unmapped_count": 0
+                  },
+                  "cohorts": [{"id": "qupath"}],
+                  "viewer_unmapped_ids": []
+                }
+                """);
+
+        var summary = HistopiaWorkflow.readWorkflowAudit(audit);
+
+        assertEquals("review_required", summary.status());
+        assertEquals(1, summary.cohortCount());
+        assertEquals(1, summary.reviewRequired());
+        assertEquals(
+                "Workflow integrity valid; scientific review required",
+                summary.displayStatus());
+
+        Files.writeString(
+                audit,
+                Files.readString(audit).replace(
+                        "\"status\": \"review_required\"",
+                        "\"status\": \"approved\""));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.readWorkflowAudit(audit));
+
+        Files.writeString(
+                audit,
+                """
+                {
+                  "schema_version": 1,
+                  "status": "approved",
+                  "summary": {
+                    "cohort_count": "1",
+                    "approved": 1,
+                    "review_required": 0,
+                    "incomplete": 0,
+                    "invalid": 0
+                  },
+                  "cohorts": [{"id": "qupath"}]
+                }
+                """);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.readWorkflowAudit(audit));
     }
 
     @Test

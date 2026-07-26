@@ -157,6 +157,34 @@ class HistopiaCommandTest {
     }
 
     @Test
+    void buildsPortableWorkflowAuditCommandWithOptionalSemanticRun() {
+        var output = Path.of("workflow audit.json");
+        var registrationOnly = HistopiaCommand.auditWorkflow(
+                "python",
+                Path.of("registration run"),
+                null,
+                output);
+        var complete = HistopiaCommand.auditWorkflow(
+                "python",
+                Path.of("registration run"),
+                Path.of("semantic run"),
+                output);
+
+        assertPythonModule(registrationOnly, "histopia.visualization._cli");
+        assertEquals("audit", registrationOnly.get(4));
+        assertEquals(
+                "qupath=" + Path.of("registration run").toAbsolutePath(),
+                registrationOnly.get(registrationOnly.indexOf("--run") + 1));
+        assertEquals(
+                output.toAbsolutePath().toString(),
+                registrationOnly.get(registrationOnly.indexOf("--output") + 1));
+        assertFalse(registrationOnly.contains("--semantic-run"));
+        assertEquals(
+                "qupath=" + Path.of("semantic run").toAbsolutePath(),
+                complete.get(complete.indexOf("--semantic-run") + 1));
+    }
+
+    @Test
     void redactsReviewNotesFromDisplayedCommand() {
         var command = HistopiaCommand.approveSemantic(
                 "python",

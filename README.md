@@ -39,6 +39,9 @@ semantic-atlas results.
   current stage artifacts, hiding stages left by an earlier workspace run
 - build and open the semantic 3D/QC viewer, then record fingerprint-bound
   semantic approval only after revalidating the exact current registration
+- audit registration seals, optional semantic bindings, and review state as
+  one path-free integrity report, while distinguishing a valid scientific
+  review gate from a malformed or incomplete workflow
 - launch a validated, compact Histopia interchange export
 - select registration and optional semantic result directories
 - discover every available K and default to Histopia's selected K
@@ -64,7 +67,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.19.jar` from the
+Download `qupath-extension-histopia-0.3.20.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -72,7 +75,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.19.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.20.jar.sha256
 ```
 
 ## Build From Source
@@ -96,6 +99,11 @@ the atlas, and choose **Approve semantic** before export. Runtime configs, the
 exact project-selection manifest, and local review portals are kept in
 `<workspace>/.histopia`. The semantic viewer is served only on an ephemeral
 `127.0.0.1` port so browser modules and local assets load correctly.
+**Audit integrity** validates the current registration and any started
+semantic run together. A valid but unapproved stage is reported as requiring
+scientific review; stale bindings, malformed approvals, and incomplete runs
+fail the action. The portable report is written to
+`<workspace>/.histopia/workflow-audit.json`.
 Reopening the tools refreshes a newly opened project while retaining the
 selected cohort and reference for the same project. Unavailable project
 entries are reported and skipped without hiding usable slides. Workflow inputs

@@ -1,5 +1,7 @@
 package qupath.ext.histopia;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -138,6 +141,39 @@ class HistopiaPythonContractTest {
                 0, semanticApprovalHelp.exitCode(), semanticApprovalHelp.output());
         assertTrue(
                 semanticApprovalHelp.output().contains("--registration-run"));
+
+        var visualizationHelp = run(List.of(
+                python, "-m", "histopia.visualization._cli", "audit", "--help"));
+        assertEquals(
+                0, visualizationHelp.exitCode(), visualizationHelp.output());
+        assertTrue(visualizationHelp.output().contains("--semantic-run"));
+
+        var registrationRun =
+                Files.createDirectories(temporaryDirectory.resolve("audit-registration"));
+        var registrationResult = new JsonObject();
+        registrationResult.addProperty("reference_slide", firstPath.toString());
+        var slides = new JsonArray();
+        var slide = new JsonObject();
+        slide.addProperty("path", firstPath.toString());
+        slide.addProperty("is_reference", true);
+        var transform = new JsonObject();
+        transform.add(
+                "matrix",
+                JsonParser.parseString("[[1,0,0],[0,1,0],[0,0,1]]"));
+        slide.add("transform", transform);
+        slides.add(slide);
+        registrationResult.add("slides", slides);
+        Files.writeString(
+                registrationRun.resolve("registration_result.json"),
+                registrationResult.toString());
+        var auditOutput = temporaryDirectory.resolve("workflow-audit.json");
+        var audit = run(HistopiaCommand.auditWorkflow(
+                python, registrationRun, null, auditOutput));
+        assertEquals(2, audit.exitCode(), audit.output());
+        assertFalse(audit.output().contains(temporaryDirectory.toString()));
+        var auditSummary = HistopiaWorkflow.readWorkflowAudit(auditOutput);
+        assertEquals("review_required", auditSummary.status());
+        assertEquals(1, auditSummary.reviewRequired());
     }
 
     @Test

@@ -147,6 +147,27 @@ final class HistopiaCommand {
                         Integer.toString(workers)));
     }
 
+    static List<String> auditWorkflow(
+            String python,
+            Path registrationRun,
+            Path semanticRun,
+            Path output) {
+        var arguments = new ArrayList<>(List.of(
+                "audit",
+                "--run",
+                "qupath=" + registrationRun.toAbsolutePath(),
+                "--output",
+                output.toAbsolutePath().toString()));
+        if (semanticRun != null) {
+            arguments.add("--semantic-run");
+            arguments.add("qupath=" + semanticRun.toAbsolutePath());
+        }
+        return moduleCommand(
+                python,
+                "histopia.visualization._cli",
+                arguments);
+    }
+
     static List<String> approveSemantic(
             String python,
             Path registrationRun,

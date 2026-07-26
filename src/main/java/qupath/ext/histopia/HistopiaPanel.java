@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -102,6 +103,7 @@ final class HistopiaPanel {
     private final Button approveProjectOrder = new Button("Approve order");
     private final Button approveProjectRegistration = new Button("Seal reviewed run");
     private final Button approveProjectSemantic = new Button("Approve semantic");
+    private final Button auditProjectWorkflow = new Button("Audit integrity");
     private final Button export = new Button("Export bundle");
     private final Button cancel = new Button("Cancel");
     private final Label status = new Label("Ready");
@@ -123,8 +125,8 @@ final class HistopiaPanel {
         projectSlides.getSelectionModel().getSelectedItems().addListener(
                 (ListChangeListener<HistopiaWorkflow.ProjectSlide>) change ->
                         refreshReferenceChoices());
-        projectSlides.setMinHeight(80);
-        projectSlides.setPrefHeight(110);
+        projectSlides.setMinHeight(60);
+        projectSlides.setPrefHeight(90);
         projectOrder.getItems().setAll(
                 "anchored_similarity", "similarity", "natural");
         projectOrder.setValue("anchored_similarity");
@@ -148,6 +150,8 @@ final class HistopiaPanel {
         alignmentQcMode.setTooltip(new Tooltip(
                 "Review writes primary slide panels; full adds forensic pair diagnostics; "
                         + "none skips post-mask alignment images"));
+        auditProjectWorkflow.setTooltip(new Tooltip(
+                "Validate exact registration seals, semantic bindings, and review state"));
         automaticReference.setSelected(true);
         projectReference.setDisable(true);
         automaticReference.selectedProperty().addListener(
@@ -249,6 +253,7 @@ final class HistopiaPanel {
         openProjectReview.setOnAction(event -> openRegistrationReview());
         openProjectSemanticReview.setOnAction(event -> openSemanticReview());
         approveProjectSemantic.setOnAction(event -> approveProjectSemantic());
+        auditProjectWorkflow.setOnAction(event -> auditProjectIntegrity());
         var review = new FlowPane(
                 labeledField("Reviewer", reviewer),
                 labeledField("Review notes", reviewNotes));
@@ -264,10 +269,13 @@ final class HistopiaPanel {
                 runProjectSemantic,
                 openProjectSemanticReview,
                 approveProjectSemantic,
+                auditProjectWorkflow,
                 checkEnvironment,
                 projectAllowModelDownload);
+        actions.setPrefWrapLength(820);
+        actions.setMinHeight(62);
         var pane = new VBox(
-                8, selectionHeader, projectSlides, paths, settings, review, actions);
+                6, selectionHeader, projectSlides, paths, settings, review, actions);
         pane.setPadding(new Insets(12));
         VBox.setVgrow(projectSlides, Priority.ALWAYS);
         return pane;
@@ -597,6 +605,42 @@ final class HistopiaPanel {
         }
     }
 
+    private void auditProjectIntegrity() {
+        try {
+            var workspacePath = requiredPath(workspace, "Analysis workspace");
+            var files = HistopiaWorkflow.workflowFiles(workspacePath);
+            if (!Files.isRegularFile(
+                    files.registrationRun().resolve("registration_result.json")))
+                throw new IllegalArgumentException(
+                        "Complete registration before auditing workflow integrity");
+            requireCurrentProjectSelection(workspacePath, files.registrationRun());
+            Files.createDirectories(files.workflowAudit().getParent());
+            var semanticRun = Files.isDirectory(files.semanticRun())
+                    ? files.semanticRun()
+                    : null;
+            startReviewGateJob(
+                    "Workflow integrity",
+                    HistopiaCommand.auditWorkflow(
+                            python.getText(),
+                            files.registrationRun(),
+                            semanticRun,
+                            files.workflowAudit()),
+                    () -> {
+                        try {
+                            status.setText(HistopiaWorkflow
+                                    .readWorkflowAudit(files.workflowAudit())
+                                    .displayStatus());
+                        } catch (IOException error) {
+                            throw new IllegalStateException(
+                                    "Could not read the Histopia workflow audit",
+                                    error);
+                        }
+                    });
+        } catch (IOException | IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia workflow integrity", error.getMessage());
+        }
+    }
+
     private void requireCurrentProjectSelection(
             Path workspacePath,
             Path registrationRun) {
@@ -768,10 +812,25 @@ final class HistopiaPanel {
         startJobs(name, List.of(command), onSuccess);
     }
 
+    private void startReviewGateJob(
+            String name,
+            List<String> command,
+            Runnable onSuccess) {
+        startJobs(name, List.of(command), onSuccess, Set.of(0, 2));
+    }
+
     private void startJobs(
             String name,
             List<List<String>> commands,
             Runnable onSuccess) {
+        startJobs(name, commands, onSuccess, Set.of(0));
+    }
+
+    private void startJobs(
+            String name,
+            List<List<String>> commands,
+            Runnable onSuccess,
+            Set<Integer> acceptedFinalExitCodes) {
         if (jobRunning) {
             Dialogs.showErrorMessage(
                     "Histopia", "Another Histopia process is already running.");
@@ -780,13 +839,19 @@ final class HistopiaPanel {
         if (commands.isEmpty())
             throw new IllegalArgumentException("Histopia job must contain a command");
         var immutableCommands = commands.stream().map(List::copyOf).toList();
+        var immutableExitCodes = Set.copyOf(acceptedFinalExitCodes);
+        if (immutableExitCodes.isEmpty())
+            throw new IllegalArgumentException(
+                    "Histopia job must accept at least one final exit code");
         jobRunning = true;
         setJobRunning(true);
         cancellationRequested = false;
         status.setText(name + " running...");
         log.clear();
         CompletableFuture
-                .supplyAsync(() -> runAll(immutableCommands), executor)
+                .supplyAsync(
+                        () -> runAll(immutableCommands, immutableExitCodes),
+                        executor)
                 .whenComplete((ignored, error) -> Platform.runLater(() -> {
                     jobRunning = false;
                     setJobRunning(false);
@@ -812,18 +877,26 @@ final class HistopiaPanel {
                 }));
     }
 
-    private String runAll(List<List<String>> commands) {
+    private String runAll(
+            List<List<String>> commands,
+            Set<Integer> acceptedFinalExitCodes) {
         String result = "";
-        for (var command : commands) {
+        for (int index = 0; index < commands.size(); index++) {
+            var command = commands.get(index);
             if (cancellationRequested)
                 throw new CancellationException("Histopia job cancelled");
             appendLog("$ " + HistopiaCommand.display(command));
-            result = run(command);
+            var acceptedExitCodes = index == commands.size() - 1
+                    ? acceptedFinalExitCodes
+                    : Set.of(0);
+            result = run(command, acceptedExitCodes);
         }
         return result;
     }
 
-    private String run(List<String> command) {
+    private String run(
+            List<String> command,
+            Set<Integer> acceptedExitCodes) {
         try {
             var process = new ProcessBuilder(command)
                     .redirectErrorStream(true)
@@ -843,7 +916,7 @@ final class HistopiaPanel {
             var exitCode = process.waitFor();
             if (cancellationRequested)
                 throw new CancellationException("Histopia job cancelled");
-            if (exitCode != 0)
+            if (!acceptedExitCodes.contains(exitCode))
                 throw new IllegalStateException(
                         "Histopia exited with code " + exitCode
                                 + (lastLine.isBlank() ? "" : ": " + lastLine));
@@ -878,6 +951,7 @@ final class HistopiaPanel {
         approveProjectOrder.setDisable(running);
         approveProjectRegistration.setDisable(running);
         approveProjectSemantic.setDisable(running);
+        auditProjectWorkflow.setDisable(running);
         export.setDisable(running);
         cancel.setDisable(!running);
         cancel.setOnAction(event -> cancelActiveJob());
