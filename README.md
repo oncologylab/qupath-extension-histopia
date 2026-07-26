@@ -31,6 +31,8 @@ semantic-atlas results.
   displaying a sealed state or launching semantic analysis
 - reject approval or semantic launch when the current QuPath selection differs
   from the prepared or sealed registration cohort
+- bind registration QC and every approval to the slide cohort inside the
+  current stage artifacts, hiding stages left by an earlier workspace run
 - build and open the semantic 3D/QC viewer, then record fingerprint-bound
   semantic approval
 - launch a validated, compact Histopia interchange export
@@ -58,7 +60,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.14.jar` from the
+Download `qupath-extension-histopia-0.3.15.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -66,7 +68,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.14.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.15.jar.sha256
 ```
 
 ## Build From Source
@@ -94,6 +96,9 @@ entries are reported and skipped without hiding usable slides. Workflow inputs
 are locked while a process is active. Starting semantic analysis verifies the
 existing registration selection and seal before atomically updating only the
 semantic runtime config, so reviewed registration provenance is not rewritten.
+When a workspace is reused after changing the selected slides, the current
+mask manifest is pruned to that cohort, stale order or alignment stages remain
+hidden, and QC, approval, and semantic actions reject mismatched artifacts.
 
 Enter `auto`, `cpu`, `cuda`, `cuda:N`, or `mps` in the semantic device
 control. **Check environment** runs the versioned `histopia-qupath` doctor in

@@ -34,6 +34,13 @@ final class HistopiaWorkflow {
             "registration_result.json",
             "mask_review.json",
             "section_order_review.json");
+    private static final String MASK_REVIEW_ARTIFACT = "mask_review.json";
+    private static final String ORDER_REVIEW_ARTIFACT = "section_order_review.json";
+    private static final String REGISTRATION_RESULT_ARTIFACT = "registration_result.json";
+    private static final Set<String> REGISTRATION_PERFORMANCE_STATUSES =
+            Set.of("running", "completed", "review_required", "failed", "interrupted");
+    private static final Set<String> FINISHED_STAGE_STATUSES =
+            Set.of("completed", "review_required");
     private static final Set<String> APPROVED_MASK_STATUSES =
             Set.of("auto_pass", "override_pass");
     private static final int MAX_AUTOMATIC_REGISTRATION_WORKERS = 4;
@@ -287,6 +294,9 @@ final class HistopiaWorkflow {
     }
 
     static String registrationStatus(Path registrationRun) {
+        var currentExecution = currentRegistrationExecutionStatus(registrationRun);
+        if (currentExecution != null)
+            return currentExecution;
         if (Files.isRegularFile(registrationRun.resolve("registration_approval.json")))
             return registrationSealValid(registrationRun)
                     ? "Registration sealed"
@@ -298,6 +308,45 @@ final class HistopiaWorkflow {
         if (Files.isRegularFile(registrationRun.resolve("mask_review.json")))
             return "Tissue mask review required";
         return "Registration completed without review artifacts";
+    }
+
+    static boolean registrationStageMatchesSelection(
+            Path registrationRun,
+            String artifactName,
+            List<ProjectSlide> selectedSlides) {
+        if (selectedSlides.size() < 2
+                || !currentRegistrationStageArtifacts(registrationRun)
+                        .contains(artifactName))
+            return false;
+        var expected = new HashSet<String>();
+        for (var slide : selectedSlides) {
+            if (!expected.add(slide.filename()))
+                return false;
+        }
+        try {
+            var masksMatch = artifactFilenamesMatch(
+                    registrationRun.resolve(MASK_REVIEW_ARTIFACT),
+                    2,
+                    "slide",
+                    expected);
+            if (MASK_REVIEW_ARTIFACT.equals(artifactName))
+                return masksMatch;
+            if (!masksMatch)
+                return false;
+            var orderMatches = artifactFilenamesMatch(
+                    registrationRun.resolve(ORDER_REVIEW_ARTIFACT),
+                    3,
+                    "slide",
+                    expected);
+            if (ORDER_REVIEW_ARTIFACT.equals(artifactName))
+                return orderMatches;
+            if (REGISTRATION_RESULT_ARTIFACT.equals(artifactName))
+                return orderMatches
+                        && registrationMatchesSelection(registrationRun, selectedSlides);
+            return false;
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
     }
 
     static boolean registrationSealValid(Path registrationRun) {
@@ -429,6 +478,114 @@ final class HistopiaWorkflow {
         } catch (IOException | RuntimeException error) {
             return false;
         }
+    }
+
+    private static String currentRegistrationExecutionStatus(Path registrationRun) {
+        var performance = validRegistrationPerformance(registrationRun);
+        if (performance == null
+                || !"review_required".equals(performance.get("status").getAsString())
+                || !hasNonblankString(performance, "review_stage"))
+            return null;
+        return switch (performance.get("review_stage").getAsString()) {
+            case "masks" -> "Tissue mask review required";
+            case "order" -> "Section order review required";
+            default -> null;
+        };
+    }
+
+    private static Set<String> currentRegistrationStageArtifacts(
+            Path registrationRun) {
+        var performance = validRegistrationPerformance(registrationRun);
+        if (performance == null)
+            return REGISTRATION_SEAL_ARTIFACTS;
+        var status = performance.get("status").getAsString();
+        if ("completed".equals(status))
+            return REGISTRATION_SEAL_ARTIFACTS;
+        if ("review_required".equals(status)
+                && hasNonblankString(performance, "review_stage")) {
+            return switch (performance.get("review_stage").getAsString()) {
+                case "masks" -> Set.of(MASK_REVIEW_ARTIFACT);
+                case "order" -> Set.of(MASK_REVIEW_ARTIFACT, ORDER_REVIEW_ARTIFACT);
+                default -> Set.of();
+            };
+        }
+        var reached = new HashSet<String>();
+        if (hasStageStatus(performance, "mask_review", FINISHED_STAGE_STATUSES))
+            reached.add(MASK_REVIEW_ARTIFACT);
+        if (hasStageStatus(
+                performance, "section_ordering", FINISHED_STAGE_STATUSES)) {
+            reached.add(MASK_REVIEW_ARTIFACT);
+            reached.add(ORDER_REVIEW_ARTIFACT);
+        }
+        if (hasStageStatus(performance, "result_write", Set.of("completed")))
+            reached.addAll(REGISTRATION_SEAL_ARTIFACTS);
+        return Set.copyOf(reached);
+    }
+
+    private static JsonObject validRegistrationPerformance(Path registrationRun) {
+        try {
+            var performance = readObject(
+                    registrationRun.resolve("registration_performance.json"));
+            var stages = performance.get("stages");
+            if (!hasIntegerValue(performance, "schema_version", 1)
+                    || !hasNonblankString(performance, "workflow")
+                    || !"registration".equals(performance.get("workflow").getAsString())
+                    || !hasBooleanValue(performance, "observational_only", true)
+                    || !hasNonblankString(performance, "status")
+                    || !REGISTRATION_PERFORMANCE_STATUSES.contains(
+                            performance.get("status").getAsString())
+                    || stages == null
+                    || !stages.isJsonObject())
+                return null;
+            return performance;
+        } catch (IOException | RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static boolean hasStageStatus(
+            JsonObject performance,
+            String stageName,
+            Set<String> statuses) {
+        var stages = performance.getAsJsonObject("stages");
+        var stage = stages.get(stageName);
+        return stage != null
+                && stage.isJsonObject()
+                && hasNonblankString(stage.getAsJsonObject(), "status")
+                && statuses.contains(
+                        stage.getAsJsonObject().get("status").getAsString());
+    }
+
+    private static boolean artifactFilenamesMatch(
+            Path artifact,
+            int schemaVersion,
+            String field,
+            Set<String> expected) throws IOException {
+        var payload = readObject(artifact);
+        if (!hasIntegerValue(payload, "schema_version", schemaVersion))
+            return false;
+        var slides = payload.getAsJsonArray("slides");
+        if (slides == null || slides.size() != expected.size())
+            return false;
+        var actual = new HashSet<String>();
+        for (var element : slides) {
+            if (!element.isJsonObject())
+                return false;
+            var row = element.getAsJsonObject();
+            if (!hasNonblankString(row, field))
+                return false;
+            final String filename;
+            try {
+                filename = Path.of(row.get(field).getAsString())
+                        .getFileName()
+                        .toString();
+            } catch (RuntimeException error) {
+                return false;
+            }
+            if (!actual.add(filename))
+                return false;
+        }
+        return actual.equals(expected);
     }
 
     private static JsonObject readObject(Path path) throws IOException {

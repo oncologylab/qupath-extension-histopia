@@ -418,6 +418,158 @@ class HistopiaWorkflowTest {
     }
 
     @Test
+    void currentExecutionStatusOverridesStaleRegistrationArtifacts() throws Exception {
+        var run = tempDir.resolve("registration");
+        Files.createDirectories(run);
+        Files.writeString(run.resolve("mask_review.json"), "{}");
+        Files.writeString(run.resolve("section_order_review.json"), "{}");
+        Files.writeString(run.resolve("registration_result.json"), "{}");
+        Files.writeString(run.resolve("registration_approval.json"), "{}");
+        var performance = new JsonObject();
+        performance.addProperty("schema_version", 1);
+        performance.addProperty("workflow", "registration");
+        performance.addProperty("observational_only", true);
+        performance.addProperty("status", "review_required");
+        performance.addProperty("review_stage", "masks");
+        performance.add("stages", new JsonObject());
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+
+        assertEquals(
+                "Tissue mask review required",
+                HistopiaWorkflow.registrationStatus(run));
+        performance.addProperty("review_stage", "order");
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertEquals(
+                "Section order review required",
+                HistopiaWorkflow.registrationStatus(run));
+        performance.addProperty("status", "completed");
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertEquals(
+                "Registration seal stale; final review required",
+                HistopiaWorkflow.registrationStatus(run));
+    }
+
+    @Test
+    void bindsRegistrationStageArtifactsToExactProjectCohort() throws Exception {
+        var run = tempDir.resolve("registration");
+        Files.createDirectories(run);
+        var first = new HistopiaWorkflow.ProjectSlide(
+                "first", "First", tempDir.resolve("slides/first.ndpi"));
+        var second = new HistopiaWorkflow.ProjectSlide(
+                "second", "Second", tempDir.resolve("slides/second.scn"));
+        var third = new HistopiaWorkflow.ProjectSlide(
+                "third", "Third", tempDir.resolve("slides/third.ndpi"));
+        var selected = List.of(first, second);
+        writeSlideArtifact(
+                run.resolve("mask_review.json"),
+                2,
+                "slide",
+                List.of(second.filename(), first.filename()));
+        writeSlideArtifact(
+                run.resolve("section_order_review.json"),
+                3,
+                "slide",
+                List.of(first.filename(), second.filename()));
+        writeSlideArtifact(
+                run.resolve("registration_result.json"),
+                null,
+                "path",
+                List.of(second.path().toString(), first.path().toString()));
+
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "mask_review.json", selected));
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "section_order_review.json", selected));
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+
+        var performance = new JsonObject();
+        performance.addProperty("schema_version", 1);
+        performance.addProperty("workflow", "registration");
+        performance.addProperty("observational_only", true);
+        performance.addProperty("status", "review_required");
+        performance.addProperty("review_stage", "masks");
+        performance.add("stages", new JsonObject());
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "mask_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "section_order_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+
+        performance.addProperty("review_stage", "order");
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "section_order_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+
+        performance.addProperty("status", "failed");
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "mask_review.json", selected));
+
+        performance.addProperty("status", "completed");
+        Files.writeString(
+                run.resolve("registration_performance.json"),
+                performance.toString());
+        assertTrue(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", List.of(first, third)));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "unknown.json", selected));
+
+        writeSlideArtifact(
+                run.resolve("mask_review.json"),
+                2,
+                "slide",
+                List.of(first.filename(), third.filename()));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "mask_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "section_order_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+
+        writeSlideArtifact(
+                run.resolve("mask_review.json"),
+                2,
+                "slide",
+                List.of(first.filename(), second.filename()));
+        writeSlideArtifact(
+                run.resolve("section_order_review.json"),
+                3,
+                "slide",
+                List.of(first.filename(), first.filename()));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "section_order_review.json", selected));
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "registration_result.json", selected));
+
+        Files.writeString(
+                run.resolve("mask_review.json"),
+                """
+                {"schema_version":"2","slides":[]}
+                """);
+        assertFalse(HistopiaWorkflow.registrationStageMatchesSelection(
+                run, "mask_review.json", selected));
+    }
+
+    @Test
     void matchesSealedRegistrationToCurrentProjectSelection() throws Exception {
         var run = tempDir.resolve("registration");
         Files.createDirectories(run);
@@ -578,5 +730,23 @@ class HistopiaWorkflowTest {
         var digest = MessageDigest.getInstance("SHA-256")
                 .digest(Files.readAllBytes(path));
         return HexFormat.of().formatHex(digest);
+    }
+
+    private static void writeSlideArtifact(
+            Path path,
+            Integer schemaVersion,
+            String field,
+            List<String> values) throws Exception {
+        var payload = new JsonObject();
+        if (schemaVersion != null)
+            payload.addProperty("schema_version", schemaVersion);
+        var slides = new JsonArray();
+        for (var value : values) {
+            var row = new JsonObject();
+            row.addProperty(field, value);
+            slides.add(row);
+        }
+        payload.add("slides", slides);
+        Files.writeString(path, payload.toString());
     }
 }

@@ -443,8 +443,8 @@ final class HistopiaPanel {
                 throw new IllegalArgumentException(
                         "Registration seal is missing or stale; review and seal "
                                 + "the exact current result before semantic analysis");
-            if (!HistopiaWorkflow.registrationMatchesSelection(
-                    files.registrationRun(), selected))
+            if (!HistopiaWorkflow.registrationStageMatchesSelection(
+                    files.registrationRun(), "registration_result.json", selected))
                 throw new IllegalArgumentException(
                         "Selected project slides do not match the sealed registration; "
                                 + "rerun registration for this selection before semantic analysis");
@@ -477,10 +477,20 @@ final class HistopiaPanel {
     private void openRegistrationReview() {
         try {
             var workspacePath = requiredPath(workspace, "Analysis workspace");
-            var run = workspacePath.resolve("registration");
+            var files = HistopiaWorkflow.workflowFiles(workspacePath);
+            var run = files.registrationRun();
             if (!Files.isRegularFile(run.resolve("mask_review.json")))
                 throw new IllegalArgumentException(
                         "Run registration once to prepare tissue masks");
+            var selected = List.copyOf(
+                    projectSlides.getSelectionModel().getSelectedItems());
+            if (!HistopiaWorkflow.selectionManifestMatches(
+                            files.selectionManifest(), selected)
+                    || !HistopiaWorkflow.registrationStageMatchesSelection(
+                            run, "mask_review.json", selected))
+                throw new IllegalArgumentException(
+                        "Selected project slides do not match the prepared mask review; "
+                                + "select the original cohort or rerun registration");
             var output = workspacePath.resolve(".histopia").resolve("registration-review");
             var index = output.resolve("index.html");
             startJob(
@@ -587,8 +597,8 @@ final class HistopiaPanel {
         if (!HistopiaWorkflow.selectionManifestMatches(
                 workspacePath.resolve(".histopia").resolve("qupath-selection.json"),
                 selected)
-                || !HistopiaWorkflow.registrationMatchesSelection(
-                        registrationRun, selected))
+                || !HistopiaWorkflow.registrationStageMatchesSelection(
+                        registrationRun, "registration_result.json", selected))
             throw new IllegalArgumentException(
                     "Selected project slides do not match this workflow result");
     }
@@ -603,12 +613,20 @@ final class HistopiaPanel {
             if (!Files.isRegularFile(run.resolve(requiredArtifact)))
                 throw new IllegalArgumentException(
                         "Run registration to prepare " + requiredArtifact);
+            var selected = List.copyOf(
+                    projectSlides.getSelectionModel().getSelectedItems());
             if (!HistopiaWorkflow.selectionManifestMatches(
                     workspacePath.resolve(".histopia").resolve("qupath-selection.json"),
-                    List.copyOf(projectSlides.getSelectionModel().getSelectedItems())))
+                    selected))
                 throw new IllegalArgumentException(
                         "Selected project slides do not match the prepared registration; "
                                 + "select the original cohort or rerun registration");
+            if (!HistopiaWorkflow.registrationStageMatchesSelection(
+                    run, requiredArtifact, selected))
+                throw new IllegalArgumentException(
+                        "The prepared " + requiredArtifact
+                                + " does not match the selected project cohort; "
+                                + "rerun registration before approval");
             var reviewerName = requiredText(reviewer, "Reviewer");
             var notes = requiredText(reviewNotes, "Review notes");
             startJob(
