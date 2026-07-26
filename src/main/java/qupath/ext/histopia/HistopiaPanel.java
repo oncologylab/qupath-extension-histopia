@@ -74,6 +74,7 @@ final class HistopiaPanel {
     private final TextField clusterMax = new TextField("15");
     private final TextField semanticBatchSize = new TextField("64");
     private final TextField patchWorkers = new TextField("1");
+    private final TextField opencvThreads = new TextField();
     private final TextField vipsThreads = new TextField();
     private final TextField fitThreads = new TextField("4");
     private final TextField reviewer = new TextField();
@@ -135,6 +136,10 @@ final class HistopiaPanel {
         semanticDevice.setValue("auto");
         semanticDevice.setTooltip(new Tooltip(
                 "UNI2-h feature-extraction backend; the global atlas fit remains on CPU"));
+        opencvThreads.setPromptText("adaptive");
+        opencvThreads.setTooltip(new Tooltip(
+                "Optional process-wide OpenCV native thread cap during registration; "
+                        + "leave blank for the host default"));
         vipsThreads.setPromptText("adaptive");
         vipsThreads.setTooltip(new Tooltip(
                 "Optional native libvips worker cap for registration and semantic "
@@ -233,6 +238,7 @@ final class HistopiaPanel {
         var settings = new FlowPane(
                 labeledField("Processed px", processedDimension),
                 labeledField("Registration workers", registrationWorkers),
+                labeledField("OpenCV threads", opencvThreads),
                 labeledField("QC workers", qcWorkers),
                 labeledField("QC detail", alignmentQcMode),
                 labeledField("Device", semanticDevice),
@@ -715,6 +721,7 @@ final class HistopiaPanel {
                 positiveInteger(clusterMax, "K max"),
                 positiveInteger(semanticBatchSize, "Semantic batch size"),
                 positiveInteger(patchWorkers, "Patch workers"),
+                optionalPositiveInteger(opencvThreads, "OpenCV threads"),
                 optionalPositiveInteger(vipsThreads, "VIPS threads"),
                 positiveInteger(fitThreads, "Semantic fit threads"));
         registrationConfig.setText(files.registrationConfig().toString());

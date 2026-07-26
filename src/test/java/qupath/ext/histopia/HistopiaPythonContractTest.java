@@ -56,6 +56,7 @@ class HistopiaPythonContractTest {
                 9,
                 16,
                 1,
+                16,
                 null,
                 2);
 
@@ -75,6 +76,7 @@ class HistopiaPythonContractTest {
                         "mask_workers": registration.mask_workers,
                         "rigid_workers": registration.rigid_workers,
                         "qc_workers": registration.qc_workers,
+                        "opencv_threads": registration.opencv_threads,
                         "alignment_qc_mode": registration.alignment_qc_mode,
                         "require_approved_masks": registration.require_approved_masks,
                         "require_approved_order": registration.require_approved_order,
@@ -106,6 +108,7 @@ class HistopiaPythonContractTest {
         assertEquals(2, registration.get("mask_workers").getAsInt());
         assertEquals(2, registration.get("rigid_workers").getAsInt());
         assertEquals(1, registration.get("qc_workers").getAsInt());
+        assertEquals(16, registration.get("opencv_threads").getAsInt());
         assertEquals("review", registration.get("alignment_qc_mode").getAsString());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());

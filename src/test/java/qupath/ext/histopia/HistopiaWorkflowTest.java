@@ -48,6 +48,7 @@ class HistopiaWorkflowTest {
                 12,
                 32,
                 2,
+                16,
                 4,
                 6);
 
@@ -71,6 +72,7 @@ class HistopiaWorkflowTest {
         assertEquals(4, registration.get("rigid_workers").getAsInt());
         assertEquals(2, registration.get("qc_workers").getAsInt());
         assertEquals("full", registration.get("alignment_qc_mode").getAsString());
+        assertEquals(16, registration.get("opencv_threads").getAsInt());
         assertEquals(4, registration.get("vips_threads").getAsInt());
         assertTrue(registration.get("require_approved_masks").getAsBoolean());
         assertTrue(registration.get("require_approved_order").getAsBoolean());
@@ -125,6 +127,7 @@ class HistopiaWorkflowTest {
                 10,
                 32,
                 1,
+                16,
                 null,
                 2);
         var registrationBefore = Files.readAllBytes(files.registrationConfig());
@@ -207,6 +210,7 @@ class HistopiaWorkflowTest {
                         32,
                         1,
                         null,
+                        null,
                         4));
         assertTrue(error.getMessage().startsWith("Section order must be"));
     }
@@ -236,7 +240,38 @@ class HistopiaWorkflowTest {
                         32,
                         1,
                         null,
+                        null,
                         4));
+    }
+
+    @Test
+    void rejectsNonpositiveOpenCvThreads() {
+        var one = new HistopiaWorkflow.ProjectSlide(
+                "one", "One", tempDir.resolve("one.ndpi"));
+        var two = new HistopiaWorkflow.ProjectSlide(
+                "two", "Two", tempDir.resolve("two.ndpi"));
+
+        var error = assertThrows(
+                IllegalArgumentException.class,
+                () -> HistopiaWorkflow.writeConfigs(
+                        tempDir.resolve("analysis"),
+                        List.of(one, two),
+                        null,
+                        "natural",
+                        1200,
+                        1,
+                        1,
+                        "review",
+                        null,
+                        "auto",
+                        5,
+                        10,
+                        32,
+                        1,
+                        0,
+                        null,
+                        4));
+        assertEquals("OpenCV threads must be positive", error.getMessage());
     }
 
     @Test
@@ -263,6 +298,7 @@ class HistopiaWorkflowTest {
                         10,
                         32,
                         1,
+                        null,
                         0,
                         4));
     }
@@ -292,12 +328,13 @@ class HistopiaWorkflowTest {
                         32,
                         1,
                         null,
+                        null,
                         4));
         assertEquals("QC workers must be positive", error.getMessage());
     }
 
     @Test
-    void omitsAdaptiveVipsThreadSetting() throws Exception {
+    void omitsAdaptiveNativeThreadSettings() throws Exception {
         var one = new HistopiaWorkflow.ProjectSlide(
                 "one", "One", tempDir.resolve("one.ndpi"));
         var two = new HistopiaWorkflow.ProjectSlide(
@@ -319,12 +356,14 @@ class HistopiaWorkflowTest {
                 32,
                 1,
                 null,
+                null,
                 4);
 
         var registration = JsonParser.parseString(
                 Files.readString(files.registrationConfig())).getAsJsonObject();
         var semantic = JsonParser.parseString(Files.readString(files.semanticConfig()))
                 .getAsJsonObject();
+        assertFalse(registration.has("opencv_threads"));
         assertFalse(registration.has("vips_threads"));
         assertEquals("none", registration.get("alignment_qc_mode").getAsString());
         assertFalse(semantic.has("vips_threads"));
@@ -355,6 +394,7 @@ class HistopiaWorkflowTest {
                         10,
                         32,
                         1,
+                        null,
                         null,
                         0));
     }

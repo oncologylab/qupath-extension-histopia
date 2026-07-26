@@ -200,6 +200,7 @@ final class HistopiaWorkflow {
             int clusterMax,
             int batchSize,
             int patchWorkers,
+            Integer opencvThreads,
             Integer vipsThreads,
             int fitThreads) throws IOException {
         if (slides.size() < 2)
@@ -209,6 +210,8 @@ final class HistopiaWorkflow {
         requirePositive(maxProcessedDimension, "Processed image dimension");
         requirePositive(workers, "Registration workers");
         requirePositive(qcWorkers, "QC workers");
+        if (opencvThreads != null)
+            requirePositive(opencvThreads, "OpenCV threads");
         requireOrderStrategy(orderStrategy);
         alignmentQcMode = normalizeAlignmentQcMode(alignmentQcMode);
         var duplicate = slides.stream()
@@ -247,6 +250,8 @@ final class HistopiaWorkflow {
         registration.addProperty("rigid_workers", workers);
         registration.addProperty("qc_workers", qcWorkers);
         registration.addProperty("alignment_qc_mode", alignmentQcMode);
+        if (opencvThreads != null)
+            registration.addProperty("opencv_threads", opencvThreads);
         if (vipsThreads != null)
             registration.addProperty("vips_threads", vipsThreads);
         registration.addProperty("preprocessing_cache", true);

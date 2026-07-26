@@ -13,8 +13,9 @@ semantic-atlas results.
 - preserve project order or morphology-sort sections, with an optional fixed
   reference as the first order anchor
 - configure registration, UNI2-h semantic analysis, CPU/GPU execution
-  including explicit `cuda:N` selection, K range, and optional native libvips
-  thread limits plus bounded global-fit threads without authoring config files
+  including explicit `cuda:N` selection, K range, and optional native OpenCV
+  and libvips thread limits plus bounded global-fit threads without authoring
+  config files
 - choose conservative automatic registration and QC worker counts capped at
   four, then tune preprocessing, rigid-pair estimation, and memory-heavier QC
   rendering independently
@@ -68,7 +69,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.21.jar` from the
+Download `qupath-extension-histopia-0.3.22.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -76,7 +77,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.21.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.22.jar.sha256
 ```
 
 ## Build From Source
@@ -136,6 +137,12 @@ portable default. The registration-worker control also bounds independent
 rigid feature preparation and reference/adjacent pair estimation. Four workers
 reduced rigid alignment from 9.32 to 3.25 seconds on one 24-slide benchmark
 without changing the registration result.
+Leave **OpenCV threads** blank for the host default, or cap OpenCV's
+process-wide native pool during registration. Histopia restores the prior
+setting when the run ends. On the same 32-vCPU host with four registration
+workers, 16 OpenCV threads used about 28% less average CPU than the 32-thread
+default for about 4% more wall time; all measured registration results were
+byte-identical.
 **QC workers** independently bounds concurrent registration diagnostics so an
 eight-worker mask setting does not force eight memory-heavier QC renderers. In
 a measured 24-slide, 1200-pixel mask run, eight workers used 1.62 GB peak
