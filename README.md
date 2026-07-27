@@ -69,7 +69,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.24.jar` from the
+Download `qupath-extension-histopia-0.3.25.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -77,7 +77,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.24.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.25.jar.sha256
 ```
 
 ## Build From Source
@@ -155,8 +155,8 @@ alignment imagery while retaining transforms, metrics, and export support. On
 a representative 24-slide run, `review` reduced registration-plus-QC time from
 69.83 to 10.97 seconds and retained artifact volume from 1.278 GB to 437 MB,
 with byte-identical registration results and primary panels. **Fit threads**
-separately caps native BLAS and OpenMP CPU work during the global semantic fit;
-four is the measured conservative default.
+separately caps independent CPU fit tasks and native BLAS/OpenMP work during
+the global semantic fit; four is the measured conservative default.
 
 The **Run analysis** tab remains available for advanced TOML or JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available

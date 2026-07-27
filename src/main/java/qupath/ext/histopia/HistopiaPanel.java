@@ -145,7 +145,7 @@ final class HistopiaPanel {
                 "Optional native libvips worker cap for registration and semantic "
                         + "WSI reads; leave blank for adaptive"));
         fitThreads.setTooltip(new Tooltip(
-                "Native CPU BLAS/OpenMP threads used for global atlas fitting"));
+                "CPU task and native BLAS/OpenMP limit for global atlas fitting"));
         registrationWorkers.setTooltip(new Tooltip(
                 "Worker cap for thumbnail, tissue-mask, section-order, and rigid-pair "
                         + "registration work"));
