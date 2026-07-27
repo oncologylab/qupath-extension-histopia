@@ -778,7 +778,7 @@ class HistopiaWorkflowTest {
                 audit,
                 """
                 {
-                  "schema_version": 1,
+                  "schema_version": 2,
                   "status": "review_required",
                   "summary": {
                     "cohort_count": 1,
@@ -815,7 +815,7 @@ class HistopiaWorkflowTest {
                 audit,
                 """
                 {
-                  "schema_version": 1,
+                  "schema_version": 2,
                   "status": "approved",
                   "summary": {
                     "cohort_count": "1",

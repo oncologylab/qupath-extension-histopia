@@ -4,8 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/oncologylab/qupath-extension-histopia?include_prereleases)](https://github.com/oncologylab/qupath-extension-histopia/releases)
 
 The Histopia extension connects QuPath 0.7 to
-[Histopia](https://github.com/oncologylab/histopia) registration and global
-semantic-atlas results.
+[Histopia](https://github.com/oncologylab/histopia) registration, global
+semantic-atlas, and semantic-topology workflows.
 
 ## Capabilities
 
@@ -27,6 +27,8 @@ semantic-atlas results.
 - run workflow-specific environment preflight automatically before
   registration, semantic analysis, and interchange export
 - run registration and global semantic-atlas configs without blocking QuPath
+- run an advanced semantic-topology config and its CPU environment preflight
+  without blocking QuPath
 - stream unbuffered Python progress, redact review notes from the command log,
   and cancel the complete Python process tree with bounded force escalation;
   current Histopia CLIs checkpoint cancelled stages as interrupted
@@ -66,10 +68,10 @@ use:
 
 ```bash
 python -m pip install \
-  "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
+  "histopia[registration,wsi,uni2h,topology,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.33.jar` from the
+Download `qupath-extension-histopia-0.3.34.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -77,7 +79,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.33.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.34.jar.sha256
 ```
 
 ## Build From Source
@@ -158,7 +160,8 @@ with byte-identical registration results and primary panels. **Fit threads**
 separately caps independent CPU fit tasks and native BLAS/OpenMP work during
 the global semantic fit; four is the measured conservative default.
 
-The **Run analysis** tab remains available for advanced TOML or JSON configs.
+The **Run analysis** tab remains available for advanced registration,
+semantic-atlas, or semantic-topology TOML and JSON configs.
 The **Export and import** tab writes a QuPath bundle, loads the available
 semantic K values, and imports annotations for the currently open matching
 source slide.

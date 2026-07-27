@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  HISTOPIA_REF: 982c6fc6ff35bcd3a21960c7765c3c6993d34b77
+  HISTOPIA_REF: bf98d3e905a304d3318feddfedd231b67b8d0ba7
 
 jobs:
   build:
@@ -36,7 +36,7 @@ jobs:
       - name: Install pinned Histopia contract
         run: >-
           python -m pip install
-          "histopia[qupath] @
+          "histopia[qupath,topology] @
           git+https://github.com/oncologylab/histopia.git@${HISTOPIA_REF}"
 
       - name: Set up Gradle

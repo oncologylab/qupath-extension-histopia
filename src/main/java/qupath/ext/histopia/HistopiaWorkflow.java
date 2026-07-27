@@ -356,7 +356,7 @@ final class HistopiaWorkflow {
 
     static WorkflowAuditSummary readWorkflowAudit(Path path) throws IOException {
         var payload = readObject(path);
-        if (!hasIntegerValue(payload, "schema_version", 1)
+        if (!hasIntegerValue(payload, "schema_version", 2)
                 || !hasNonblankString(payload, "status"))
             throw new IllegalArgumentException("Workflow audit schema is invalid");
         var status = payload.get("status").getAsString();

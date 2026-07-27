@@ -84,6 +84,7 @@ final class HistopiaPanel {
             new CheckBox("Allow authenticated model download");
     private final TextField registrationConfig = new TextField();
     private final TextField semanticConfig = new TextField();
+    private final TextField topologyConfig = new TextField();
     private final TextField registration = new TextField();
     private final TextField semantic = new TextField();
     private final TextField output = new TextField();
@@ -95,6 +96,7 @@ final class HistopiaPanel {
     private final ComboBox<Integer> clusters = new ComboBox<>();
     private final Button runRegistration = new Button("Run registration");
     private final Button runSemantic = new Button("Run semantic atlas");
+    private final Button runTopology = new Button("Run topology");
     private final Button checkEnvironment = new Button("Check environment");
     private final Button runProjectRegistration = new Button("Run registration");
     private final Button runProjectSemantic = new Button("Run semantic atlas");
@@ -292,10 +294,12 @@ final class HistopiaPanel {
         var grid = configuredGrid();
         addFileRow(grid, 0, "Registration config", registrationConfig);
         addFileRow(grid, 1, "Semantic config", semanticConfig);
-        grid.add(allowModelDownload, 1, 2);
+        addFileRow(grid, 2, "Topology config", topologyConfig);
+        grid.add(allowModelDownload, 1, 3);
         runRegistration.setOnAction(event -> startRegistration());
         runSemantic.setOnAction(event -> startSemantic());
-        grid.add(new HBox(8, runRegistration, runSemantic), 1, 3);
+        runTopology.setOnAction(event -> startTopology());
+        grid.add(new HBox(8, runRegistration, runSemantic, runTopology), 1, 4);
         return grid;
     }
 
@@ -762,6 +766,17 @@ final class HistopiaPanel {
         }
     }
 
+    private void startTopology() {
+        try {
+            var command = HistopiaCommand.runTopology(
+                    python.getText(),
+                    requiredFile(topologyConfig, "Topology config"));
+            startCheckedJob("Semantic topology", "topology", command, null);
+        } catch (IllegalArgumentException error) {
+            Dialogs.showErrorMessage("Histopia semantic topology", error.getMessage());
+        }
+    }
+
     private void exportBundle() {
         try {
             var semanticPath = includeSemantic.isSelected()
@@ -950,6 +965,7 @@ final class HistopiaPanel {
         python.setDisable(running);
         runRegistration.setDisable(running);
         runSemantic.setDisable(running);
+        runTopology.setDisable(running);
         runProjectRegistration.setDisable(running);
         runProjectSemantic.setDisable(running);
         checkEnvironment.setDisable(running);

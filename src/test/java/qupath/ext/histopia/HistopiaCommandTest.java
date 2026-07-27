@@ -42,6 +42,8 @@ class HistopiaCommandTest {
                 "python", Path.of("registration.toml"));
         var semantic = HistopiaCommand.runSemantic(
                 "python", Path.of("semantic.toml"), true);
+        var topology = HistopiaCommand.runTopology(
+                "python", Path.of("topology.toml"));
 
         assertPythonModule(registration, "histopia.registration._cli");
         assertEquals("--config", registration.get(4));
@@ -49,6 +51,11 @@ class HistopiaCommandTest {
         assertPythonModule(semantic, "histopia.semantic._cli");
         assertEquals("run", semantic.get(4));
         assertEquals("--allow-model-download", semantic.get(semantic.size() - 1));
+        assertPythonModule(topology, "histopia.topology._cli");
+        assertEquals("run", topology.get(4));
+        assertEquals(
+                Path.of("topology.toml").toAbsolutePath().toString(),
+                topology.get(topology.indexOf("--config") + 1));
     }
 
     @Test
@@ -60,7 +67,7 @@ class HistopiaCommandTest {
         assertEquals("--doctor", command.get(4));
         assertEquals("semantic", command.get(command.indexOf("--workflow") + 1));
         assertEquals("cuda:2", command.get(command.indexOf("--device") + 1));
-        assertEquals("1", command.get(command.indexOf("--require-api") + 1));
+        assertEquals("2", command.get(command.indexOf("--require-api") + 1));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> HistopiaCommand.inspectEnvironment(

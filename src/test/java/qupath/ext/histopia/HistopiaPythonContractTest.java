@@ -123,7 +123,7 @@ class HistopiaPythonContractTest {
         assertEquals(0, doctor.exitCode(), doctor.output());
         var report = JsonParser.parseString(doctor.output()).getAsJsonObject();
         assertEquals("ok", report.get("status").getAsString());
-        assertEquals(1, report.get("qupath_workflow_api_version").getAsInt());
+        assertEquals(2, report.get("qupath_workflow_api_version").getAsInt());
         assertEquals(
                 4,
                 report.getAsJsonObject("capabilities")
@@ -146,6 +146,14 @@ class HistopiaPythonContractTest {
         assertEquals(0, semanticHelp.exitCode(), semanticHelp.output());
         assertTrue(semanticHelp.output().contains("--allow-model-download"));
         assertTrue(semanticHelp.output().contains("--fit-threads"));
+        var topologyHelp = run(List.of(
+                python, "-m", "histopia.topology._cli", "run", "--help"));
+        assertEquals(0, topologyHelp.exitCode(), topologyHelp.output());
+        assertTrue(topologyHelp.output().contains("--config"));
+        var topologyDoctor = run(HistopiaCommand.inspectEnvironment(
+                python, "cpu", "topology"));
+        assertEquals(0, topologyDoctor.exitCode(), topologyDoctor.output());
+        assertTrue(topologyDoctor.output().contains("\"topology_api_version\": 1"));
         var semanticApprovalHelp = run(List.of(
                 python, "-m", "histopia.semantic._cli", "approve", "--help"));
         assertEquals(

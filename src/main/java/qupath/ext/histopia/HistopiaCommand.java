@@ -7,10 +7,10 @@ import java.util.Set;
 
 final class HistopiaCommand {
 
-    private static final int QUPATH_WORKFLOW_API_VERSION = 1;
+    private static final int QUPATH_WORKFLOW_API_VERSION = 2;
     private static final Set<String> REDACTED_OPTIONS = Set.of("--review-notes");
     private static final Set<String> WORKFLOWS =
-            Set.of("registration", "semantic", "interchange", "full");
+            Set.of("registration", "semantic", "topology", "interchange", "full");
 
     private HistopiaCommand() {
     }
@@ -68,6 +68,30 @@ final class HistopiaCommand {
         return moduleCommand(python, "histopia.semantic._cli", arguments);
     }
 
+    static List<String> runTopology(String python, Path config) {
+        return moduleCommand(
+                python,
+                "histopia.topology._cli",
+                List.of(
+                        "run",
+                        "--config",
+                        config.toAbsolutePath().toString()));
+    }
+
+    static List<String> buildTopologyReview(
+            String python,
+            Path topologyRun,
+            Path output) {
+        return moduleCommand(
+                python,
+                "histopia.visualization._cli",
+                List.of(
+                        "topology-review",
+                        output.toAbsolutePath().toString(),
+                        "--run",
+                        "qupath=" + topologyRun.toAbsolutePath()));
+    }
+
     static List<String> inspectEnvironment(
             String python,
             String device,
@@ -75,7 +99,7 @@ final class HistopiaCommand {
         var normalizedWorkflow = workflow == null ? "" : workflow.strip().toLowerCase();
         if (!WORKFLOWS.contains(normalizedWorkflow))
             throw new IllegalArgumentException(
-                    "Workflow must be registration, semantic, interchange, or full");
+                    "Workflow must be registration, semantic, topology, interchange, or full");
         var normalizedDevice = Set.of("semantic", "full").contains(normalizedWorkflow)
                 ? HistopiaWorkflow.normalizeDevice(device)
                 : "auto";
