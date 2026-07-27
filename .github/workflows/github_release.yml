@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Version tag to create, for example v0.3.26
+        description: Version tag to create, for example v0.3.27
         required: true
         type: string
 
 env:
-  HISTOPIA_REF: 9edf9f0f1234ad192bd794d09b8f259b42cb2e2c
+  HISTOPIA_REF: e13d072dc233b3a7f145328d0172542885811353
 
 jobs:
   build:
@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: qupath-extension-histopia-release
-          path: build/libs/qupath-extension-histopia-0.3.26.jar
+          path: build/libs/qupath-extension-histopia-0.3.27.jar
           retention-days: 7
 
   release:
@@ -66,9 +66,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          test "$RELEASE_TAG" = "v0.3.26"
-          sha256sum qupath-extension-histopia-0.3.26.jar \
-            > qupath-extension-histopia-0.3.26.jar.sha256
+          test "$RELEASE_TAG" = "v0.3.27"
+          sha256sum qupath-extension-histopia-0.3.27.jar \
+            > qupath-extension-histopia-0.3.27.jar.sha256
 
       - name: Create draft release
         env:
@@ -80,6 +80,6 @@ jobs:
             --target "$GITHUB_SHA" \
             --draft \
             --generate-notes \
-            --title "Histopia for QuPath 0.3.26" \
-            qupath-extension-histopia-0.3.26.jar \
-            qupath-extension-histopia-0.3.26.jar.sha256
+            --title "Histopia for QuPath 0.3.27" \
+            qupath-extension-histopia-0.3.27.jar \
+            qupath-extension-histopia-0.3.27.jar.sha256
