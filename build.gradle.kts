@@ -6,7 +6,7 @@ plugins {
 qupathExtension {
     name = "qupath-extension-histopia"
     group = "org.oncologylab"
-    version = "0.3.28"
+    version = "0.3.29"
     description = "Project-driven Histopia registration and semantic atlas workflows"
     automaticModule = "org.oncologylab.qupath.extension.histopia"
 }
