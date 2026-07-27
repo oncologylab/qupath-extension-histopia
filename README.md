@@ -22,8 +22,8 @@ semantic-atlas results.
 - choose `review`, `none`, or `full` registration QC detail, with the
   production `review` tier retaining primary per-slide panels without
   generating every forensic pair diagnostic
-- validate the selected Histopia workflow API, Python dependencies, native
-  libvips runtime, and compute device directly from the extension
+- validate the selected Histopia workflow API, supported Python dependency
+  ranges, native libvips runtime, and compute device directly from the extension
 - run workflow-specific environment preflight automatically before
   registration, semantic analysis, and interchange export
 - run registration and global semantic-atlas configs without blocking QuPath
@@ -69,7 +69,7 @@ python -m pip install \
   "histopia[registration,wsi,uni2h,qupath] @ git+https://github.com/oncologylab/histopia.git@main"
 ```
 
-Download `qupath-extension-histopia-0.3.31.jar` from the
+Download `qupath-extension-histopia-0.3.32.jar` from the
 [latest release](https://github.com/oncologylab/qupath-extension-histopia/releases/latest).
 Drag the JAR onto QuPath 0.7, restart QuPath, then open
 **Extensions > Histopia > Open Histopia tools**.
@@ -77,7 +77,7 @@ Drag the JAR onto QuPath 0.7, restart QuPath, then open
 The release also includes a SHA-256 checksum file. Verify it before installing:
 
 ```bash
-sha256sum --check qupath-extension-histopia-0.3.31.jar.sha256
+sha256sum --check qupath-extension-histopia-0.3.32.jar.sha256
 ```
 
 ## Build From Source

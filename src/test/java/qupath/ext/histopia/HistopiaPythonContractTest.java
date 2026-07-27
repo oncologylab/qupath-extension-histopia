@@ -129,6 +129,12 @@ class HistopiaPythonContractTest {
                 report.getAsJsonObject("capabilities")
                         .get("qupath_interchange_schema_version")
                         .getAsInt());
+        assertEquals(
+                "numpy<3,>=1.26",
+                report.getAsJsonObject("dependencies")
+                        .getAsJsonObject("numpy")
+                        .get("requirement")
+                        .getAsString());
 
         var registrationHelp = run(List.of(
                 python, "-m", "histopia.registration._cli", "--help"));
