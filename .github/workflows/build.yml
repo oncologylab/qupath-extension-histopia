@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  HISTOPIA_REF: ee51204523239e5c16b63bea2b758ceaf030543c
+  HISTOPIA_REF: 335773049c501fdc14ccb1b417e5c15b8ce80f4c
 
 jobs:
   build:
